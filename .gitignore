@@ -30,3 +30,5 @@ ml-service/venv/
 # Editor
 .vscode/
 .idea/
+ml-service/data/raw/
+ml-service/venv/

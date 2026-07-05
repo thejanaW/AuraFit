@@ -2,7 +2,16 @@
   "permissions": {
     "allow": [
       "Bash(npm install *)",
-      "Bash(git -C /Users/thejanaw/Documents/thejana/UNI/AuraFit status)"
+      "Bash(git -C /Users/thejanaw/Documents/thejana/UNI/AuraFit status)",
+      "Read(//opt/homebrew/bin/**)",
+      "Read(//Users/thejanaw/.pyenv/**)",
+      "Bash(brew list *)",
+      "Bash(conda --version)",
+      "Bash(pip3 --version)",
+      "Bash(python3 -m venv venv)",
+      "Bash(/Users/thejanaw/Documents/thejana/UNI/AuraFit/ml-service/venv/bin/pip install *)",
+      "Bash(/Users/thejanaw/Documents/thejana/UNI/AuraFit/ml-service/venv/bin/python3 *)",
+      "Bash(venv/bin/python3 *)"
     ]
   }
 }
