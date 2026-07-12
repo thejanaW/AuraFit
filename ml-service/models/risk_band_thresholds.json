@@ -1,0 +1,18 @@
+{
+  "heart_attack": {
+    "low_upper": 0.187117,
+    "moderate_upper": 0.478745
+  },
+  "heart_disease": {
+    "low_upper": 0.156837,
+    "moderate_upper": 0.474999
+  },
+  "diabetes": {
+    "low_upper": 0.260367,
+    "moderate_upper": 0.531163
+  },
+  "high_bp": {
+    "low_upper": 0.342536,
+    "moderate_upper": 0.623678
+  }
+}

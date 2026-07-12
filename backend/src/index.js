@@ -3,6 +3,8 @@ const express = require('express');
 const cors = require('cors');
 
 const authRouter = require('./routes/auth');
+const predictionsRouter = require('./routes/predictions');
+const healthInputsRouter = require('./routes/healthInputs');
 
 const app = express();
 
@@ -10,6 +12,8 @@ app.use(cors());
 app.use(express.json());
 
 app.use('/auth', authRouter);
+app.use('/api/predictions', predictionsRouter);
+app.use('/api/health-inputs', healthInputsRouter);
 
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 

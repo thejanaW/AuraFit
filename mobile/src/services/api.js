@@ -30,4 +30,16 @@ export const api = {
     }),
 
   refresh: () => request('/auth/refresh', { method: 'POST' }),
+
+  saveHealthInputs: (payload) =>
+    request('/api/health-inputs', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  createPrediction: (payload) =>
+    request('/api/predictions', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
 };
