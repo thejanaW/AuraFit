@@ -35,17 +35,48 @@ FEATURES = ORDINAL_FEATURES + NOMINAL_FEATURES
 CONDITIONS = ["heart_attack", "heart_disease", "diabetes", "high_bp"]
 
 # ---------------------------------------------------------------------------
+# Age-sensitive risk bands (Chunk 3 revision — dissertation reference)
+#
+# Tercile thresholds are now computed per life-stage bucket (4 buckets × 4
+# conditions, see define_risk_bands.py), because age dominates the models'
+# learned risk: under global terciles nearly every under-35 landed "Low"
+# regardless of lifestyle. Bucket-specific terciles make a band mean "your
+# rank against your own age peers", so lifestyle can actually move it.
+#
+# 4 buckets rather than the 13 BRFSS bands: the data-sufficiency check
+# (scratchpad/age_sufficiency_check.py) showed the 4 buckets already carry
+# most of the age gradient (~19x heart-attack prevalence spread, 0.5% →
+# 9.6%), while finer bands leave per-tercile positive counts too thin to
+# validate — e.g. only 45 heart-disease positives in the whole 25-29 band.
+#
+# The mobile app projects age +10 years before banding (see
+# onboardingPayloads.js), so the bucket is chosen from the PROJECTED age —
+# the two mechanisms combine into "your rank among the age peers you're
+# heading towards".
+# ---------------------------------------------------------------------------
+AGE_GROUP_TO_BUCKET = {
+    1: "18-34", 2: "18-34", 3: "18-34",
+    4: "35-49", 5: "35-49", 6: "35-49",
+    7: "50-64", 8: "50-64", 9: "50-64",
+    10: "65+", 11: "65+", 12: "65+", 13: "65+",
+}
+
+# ---------------------------------------------------------------------------
 # Overall health score — weighting logic (dissertation reference)
 #
 # Step 1 — normalise each condition's raw probability to a 0-1 "risk index".
 #   The models were trained with class_weight="balanced", which inflates raw
 #   probabilities by a different amount per condition, so raw values are NOT
 #   comparable across conditions. The saved tercile thresholds, however, are
-#   known population anchor points: low_upper is the 33rd percentile of
-#   predicted risk and moderate_upper the 67th. Mapping piecewise-linearly
+#   known anchor points: low_upper is the 33rd percentile of predicted risk
+#   and moderate_upper the 67th. Mapping piecewise-linearly
 #     0 → 0.0,  low_upper → 1/3,  moderate_upper → 2/3,  1 → 1.0
-#   converts every condition onto the same approximate population-percentile
-#   scale (0 = lowest risk in the population, 1 = highest).
+#   converts every condition onto the same approximate percentile scale.
+#   Since the thresholds became bucket-specific (see AGE_GROUP_TO_BUCKET),
+#   these anchors are the requester's AGE-BUCKET terciles, so the overall
+#   score is likewise peer-relative: 0 = lowest predicted risk among the
+#   (projected) age peers, 1 = highest. This keeps the score consistent
+#   with the bands rather than mixing a global scale with peer-based bands.
 #
 # Step 2 — weighted average of the four risk indices:
 #   heart_attack   0.30   acute, potentially fatal cardiac event
@@ -148,11 +179,15 @@ def predict(inputs: LifestyleInput):
         row = pd.DataFrame([inputs.model_dump()])[FEATURES]
         X = ARTIFACTS["preprocessor"].transform(row)
 
+        # Bucket-specific thresholds, keyed by the (projected) age bucket
+        bucket = AGE_GROUP_TO_BUCKET[inputs.age_group]
+        bucket_thresholds = ARTIFACTS["thresholds"][bucket]
+
         risk_breakdown, raw_probabilities = {}, {}
         weighted_risk = 0.0
         for cond in CONDITIONS:
             p = float(ARTIFACTS[cond].predict_proba(X)[0, 1])
-            cutoffs = ARTIFACTS["thresholds"][cond]
+            cutoffs = bucket_thresholds[cond]
             raw_probabilities[cond] = round(p, 4)
             risk_breakdown[cond] = probability_to_band(p, cutoffs)
             weighted_risk += CONDITION_WEIGHTS[cond] * probability_to_risk_index(p, cutoffs)

@@ -42,4 +42,11 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
+
+  // Returns { prediction, previous } — both null-safe; previous feeds the
+  // Home screen's trend card without a second request.
+  getLatestPrediction: () => request('/api/predictions/latest'),
+
+  // Returns { total } — lifetime points sum for the authed user.
+  getPointsTotal: () => request('/api/points/total'),
 };

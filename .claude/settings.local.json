@@ -38,7 +38,17 @@
       "Bash(curl -m 60 -s -o /tmp/ml_out.json -w \"HTTP %{http_code} in %{time_total}s\\\\n\" -X POST http://localhost:8000/predict -H \"Content-Type: application/json\" -d '{\"age_group\":7,\"sex\":1,\"bmi\":27.5,\"physical_activity_cat\":2,\"smoking_status\":4,\"heavy_drinker\":1,\"general_health\":2}')",
       "Read(//tmp/**)",
       "Bash(curl *)",
-      "Bash(xcrun simctl *)"
+      "Bash(xcrun simctl *)",
+      "Bash(PORT=3999 node *)",
+      "Bash(kill %1)",
+      "Bash(pkill -f \"node src/index.js\")",
+      "Skill(run)",
+      "Bash(kill 8861 8883)",
+      "Bash(./node_modules/.bin/sucrase src/screens/onboarding/steps --out-dir /private/tmp/claude-501/-Users-thejanaw-Documents-thejana-UNI-AuraFit/a58b2a79-5ac1-4749-9d06-6dce0ebe54ce/scratchpad/transpiled --transforms jsx,imports)",
+      "Bash(./venv/bin/uvicorn main:app --port 8000)",
+      "Bash(break)",
+      "Bash(/Users/thejanaw/Documents/thejana/UNI/AuraFit/ml-service/venv/bin/python *)",
+      "Bash(xargs kill)"
     ]
   }
 }

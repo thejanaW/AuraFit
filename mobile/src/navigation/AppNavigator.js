@@ -3,6 +3,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { ActivityIndicator, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 import { useAuth } from '../context/AuthContext';
 import LoginScreen from '../screens/LoginScreen';
@@ -15,19 +16,32 @@ import OnboardingScreen from '../screens/onboarding/OnboardingScreen';
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
+const TAB_ICONS = {
+  Home: 'home',
+  Habits: 'checkbox',
+  Map: 'map',
+};
+
 function MainTabs() {
   return (
     <Tab.Navigator
-      screenOptions={{
+      screenOptions={({ route }) => ({
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: '#111',
-          borderTopColor: '#222',
+          backgroundColor: '#131315',
+          borderTopColor: '#2C2C2E',
         },
         tabBarActiveTintColor: '#FF5A36',
-        tabBarInactiveTintColor: '#555',
+        tabBarInactiveTintColor: '#666',
         tabBarLabelStyle: { fontSize: 11 },
-      }}
+        tabBarIcon: ({ focused, color, size }) => (
+          <Ionicons
+            name={focused ? TAB_ICONS[route.name] : `${TAB_ICONS[route.name]}-outline`}
+            size={size}
+            color={color}
+          />
+        ),
+      })}
     >
       <Tab.Screen name="Home" component={HomeScreen} />
       <Tab.Screen name="Habits" component={HabitsScreen} />
@@ -36,9 +50,9 @@ function MainTabs() {
   );
 }
 
-// TODO(chunk 2): gate the initial route on whether the user already has a
-// prediction (needs a GET /api/predictions/latest endpoint). For now every
-// login lands on Onboarding so Step 1 can be tested.
+// TODO(chunk 3): gate the initial route on whether the user already has a
+// prediction — GET /api/predictions/latest now exists (api.getLatestPrediction),
+// so this is ready to wire. For now every login still lands on Onboarding.
 function AppStack() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>

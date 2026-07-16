@@ -1,18 +1,74 @@
 {
-  "heart_attack": {
-    "low_upper": 0.187117,
-    "moderate_upper": 0.478745
+  "18-34": {
+    "heart_attack": {
+      "low_upper": 0.040423,
+      "moderate_upper": 0.081264
+    },
+    "heart_disease": {
+      "low_upper": 0.027447,
+      "moderate_upper": 0.058072
+    },
+    "diabetes": {
+      "low_upper": 0.08085,
+      "moderate_upper": 0.163225
+    },
+    "high_bp": {
+      "low_upper": 0.096725,
+      "moderate_upper": 0.16994
+    }
   },
-  "heart_disease": {
-    "low_upper": 0.156837,
-    "moderate_upper": 0.474999
+  "35-49": {
+    "heart_attack": {
+      "low_upper": 0.101421,
+      "moderate_upper": 0.209319
+    },
+    "heart_disease": {
+      "low_upper": 0.078615,
+      "moderate_upper": 0.166073
+    },
+    "diabetes": {
+      "low_upper": 0.165367,
+      "moderate_upper": 0.322456
+    },
+    "high_bp": {
+      "low_upper": 0.219507,
+      "moderate_upper": 0.359985
+    }
   },
-  "diabetes": {
-    "low_upper": 0.260367,
-    "moderate_upper": 0.531163
+  "50-64": {
+    "heart_attack": {
+      "low_upper": 0.236516,
+      "moderate_upper": 0.440554
+    },
+    "heart_disease": {
+      "low_upper": 0.211329,
+      "moderate_upper": 0.412295
+    },
+    "diabetes": {
+      "low_upper": 0.308162,
+      "moderate_upper": 0.52378
+    },
+    "high_bp": {
+      "low_upper": 0.413372,
+      "moderate_upper": 0.584593
+    }
   },
-  "high_bp": {
-    "low_upper": 0.342536,
-    "moderate_upper": 0.623678
+  "65+": {
+    "heart_attack": {
+      "low_upper": 0.464485,
+      "moderate_upper": 0.682888
+    },
+    "heart_disease": {
+      "low_upper": 0.478662,
+      "moderate_upper": 0.688399
+    },
+    "diabetes": {
+      "low_upper": 0.473351,
+      "moderate_upper": 0.671546
+    },
+    "high_bp": {
+      "low_upper": 0.614773,
+      "moderate_upper": 0.752144
+    }
   }
 }

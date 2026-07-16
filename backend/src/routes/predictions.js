@@ -94,4 +94,26 @@ router.post('/', requireAuth, async (req, res) => {
   res.status(201).json({ prediction: data });
 });
 
+// GET /api/predictions/latest — most recent prediction for the authed user.
+// Also returns the one before it (`previous`) so the Home screen can compute
+// the week-trend delta without a second round trip. Both are null-safe:
+// { prediction: null } means the user hasn't completed onboarding yet.
+router.get('/latest', requireAuth, async (req, res) => {
+  const { data, error } = await supabase
+    .from('predictions')
+    .select('*')
+    .eq('user_id', req.userId)
+    .order('created_at', { ascending: false })
+    .limit(2);
+
+  if (error) {
+    return res.status(500).json({ error: `Failed to fetch predictions: ${error.message}` });
+  }
+
+  res.json({
+    prediction: data[0] ?? null,
+    previous: data[1] ?? null,
+  });
+});
+
 module.exports = router;

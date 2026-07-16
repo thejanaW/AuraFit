@@ -25,12 +25,30 @@ function required(answers, key) {
 }
 
 // _AGEG5YR five-year bands. The model is trained on adults (18+).
+// Caps at band 13 (80+), so any projected age past 80 saturates at the top
+// band rather than falling outside the range the model was trained on.
 export function ageToAgeGroup(age) {
   if (age < 18) throw new Error('Age must be 18 or over');
   if (age < 25) return 1;
   if (age >= 80) return 13;
   return Math.floor((age - 25) / 5) + 2;
 }
+
+// Ten-year risk projection (dissertation methodology note):
+// Testing showed age dominates the model's learned risk relationships — an
+// unhealthy 22-year-old (BMI 31.6, daily smoker, inactive) still scored in
+// the mid-80s because diagnosis prevalence is so low in the youngest BRFSS
+// bands that lifestyle factors barely move the cross-sectional risk. Rather
+// than reweighting or retraining, the user's age is shifted forward
+// RISK_PROJECTION_YEARS before banding, while every other feature keeps its
+// real current value. This uses the model's own learned cross-sectional
+// age-risk relationship as a proxy for a longitudinal projection: "if these
+// habits continue, this is roughly where you'd land in ~10 years." It
+// reframes the Aura Score as a ~10-year projection rather than a
+// current-state snapshot (the UI says so next to the score), and is a
+// documented, defensible simplification — a pure input shift at the payload
+// layer, not a change to the model or scoring logic.
+export const RISK_PROJECTION_YEARS = 10;
 
 // Direct mapping to SEXVAR — the form offers exactly the two BRFSS codes
 export function genderToSex(gender) {
@@ -121,8 +139,13 @@ function mapOrThrow(map, value, field) {
 
 // The 7 model features for POST /api/predictions
 export function buildModelPayload(answers) {
+  const currentAge = required(answers, 'age');
+  // Validate the REAL age here — ageToAgeGroup's 18+ check can't catch an
+  // underage input once the projection has been added on top of it.
+  if (currentAge < 18) throw new Error('Age must be 18 or over');
   return {
-    age_group: ageToAgeGroup(required(answers, 'age')),
+    // Age is the only projected feature — see RISK_PROJECTION_YEARS above
+    age_group: ageToAgeGroup(currentAge + RISK_PROJECTION_YEARS),
     sex: genderToSex(required(answers, 'gender')),
     bmi: calculateBmi(required(answers, 'heightCm'), required(answers, 'weightKg')),
     physical_activity_cat: mapOrThrow(
