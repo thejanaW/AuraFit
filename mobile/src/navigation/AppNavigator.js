@@ -6,6 +6,7 @@ import { ActivityIndicator, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useAuth } from '../context/AuthContext';
+import { HabitsProvider } from '../context/HabitsContext';
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 import HomeScreen from '../screens/HomeScreen';
@@ -24,29 +25,33 @@ const TAB_ICONS = {
 
 function MainTabs() {
   return (
-    <Tab.Navigator
-      screenOptions={({ route }) => ({
-        headerShown: false,
-        tabBarStyle: {
-          backgroundColor: '#131315',
-          borderTopColor: '#2C2C2E',
-        },
-        tabBarActiveTintColor: '#FF5A36',
-        tabBarInactiveTintColor: '#666',
-        tabBarLabelStyle: { fontSize: 11 },
-        tabBarIcon: ({ focused, color, size }) => (
-          <Ionicons
-            name={focused ? TAB_ICONS[route.name] : `${TAB_ICONS[route.name]}-outline`}
-            size={size}
-            color={color}
-          />
-        ),
-      })}
-    >
-      <Tab.Screen name="Home" component={HomeScreen} />
-      <Tab.Screen name="Habits" component={HabitsScreen} />
-      <Tab.Screen name="Map" component={MapScreen} />
-    </Tab.Navigator>
+    // HabitsProvider sits above the tabs so Home and Habits share one live
+    // copy of today's completion state (see HabitsContext.js)
+    <HabitsProvider>
+      <Tab.Navigator
+        screenOptions={({ route }) => ({
+          headerShown: false,
+          tabBarStyle: {
+            backgroundColor: '#131315',
+            borderTopColor: '#2C2C2E',
+          },
+          tabBarActiveTintColor: '#FF5A36',
+          tabBarInactiveTintColor: '#666',
+          tabBarLabelStyle: { fontSize: 11 },
+          tabBarIcon: ({ focused, color, size }) => (
+            <Ionicons
+              name={focused ? TAB_ICONS[route.name] : `${TAB_ICONS[route.name]}-outline`}
+              size={size}
+              color={color}
+            />
+          ),
+        })}
+      >
+        <Tab.Screen name="Home" component={HomeScreen} />
+        <Tab.Screen name="Habits" component={HabitsScreen} />
+        <Tab.Screen name="Map" component={MapScreen} />
+      </Tab.Navigator>
+    </HabitsProvider>
   );
 }
 

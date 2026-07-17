@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   RefreshControl,
@@ -11,20 +11,29 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 
 import { useAuth } from '../context/AuthContext';
+import { useHabits } from '../context/HabitsContext';
 import { api } from '../services/api';
 import { colors, fonts, cardStyle } from '../theme';
 
-// TEMPORARY (Chunk 3): hardcoded habits matching the Figma design, shown until
-// Gemini habit generation is wired up. Replace with GET /api/habits/today once
-// the Gemini pipeline + habits table flow exists.
-const PLACEHOLDER_HABITS = [
-  { id: 'ph-1', title: 'Drink 8 glasses of water', subtext: 'Hydration supports blood pressure', points: 10, completed: true },
-  { id: 'ph-2', title: '30 minute brisk walk', subtext: 'Cardio lowers heart disease risk', points: 20, completed: false },
-  { id: 'ph-3', title: 'No screens after 10pm', subtext: 'Better sleep, lower stress', points: 15, completed: false },
+// Per-condition risk breakdown (predictions.risk_breakdown jsonb). Labels are
+// the four real model conditions — deliberately NOT the older Figma screen's
+// categories ("Cardiovascular", "Mental Wellbeing"), which don't match what
+// the models actually predict. Band → 1-3 segments + a themed status color.
+const RISK_CONDITIONS = [
+  { key: 'heart_attack', label: 'Heart Attack' },
+  { key: 'heart_disease', label: 'Heart Disease' },
+  { key: 'diabetes', label: 'Diabetes' },
+  { key: 'high_bp', label: 'High Blood Pressure' },
 ];
-const HABITS_PER_DAY = 5; // daily checklist size once Gemini generation lands
+const RISK_BAND_SEGMENTS = { Low: 1, Moderate: 2, High: 3 };
+const RISK_BAND_COLORS = {
+  Low: colors.positive,
+  Moderate: colors.warning,
+  High: colors.negative,
+};
 
 function timeGreeting() {
   const hour = new Date().getHours();
@@ -44,6 +53,10 @@ function displayName(email) {
 export default function HomeScreen() {
   const { user, logout } = useAuth();
   const insets = useSafeAreaInsets();
+  // Shared habits state (see HabitsContext) — a toggle on the Habits tab is
+  // reflected here immediately, both screens read the same object. reasoning
+  // is the Gemini "why your score looks this way" text stored with the set.
+  const { habits, completedCount, hasCurrentSet, reasoning, monthLabel } = useHabits();
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -67,9 +80,13 @@ export default function HomeScreen() {
     }
   }, []);
 
-  useEffect(() => {
-    loadDashboard().finally(() => setLoading(false));
-  }, [loadDashboard]);
+  // Refetch on every focus (not just mount) so the POINTS card picks up habit
+  // completions logged on the Habits tab; spinner only blocks the first load.
+  useFocusEffect(
+    useCallback(() => {
+      loadDashboard().finally(() => setLoading(false));
+    }, [loadDashboard])
+  );
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -89,8 +106,6 @@ export default function HomeScreen() {
           previous.predicted_health_score) *
         100
       : null;
-
-  const completedCount = PLACEHOLDER_HABITS.filter((h) => h.completed).length;
 
   if (loading) {
     return (
@@ -213,33 +228,96 @@ export default function HomeScreen() {
           </View>
         )}
 
-        {/* Today's habits (placeholder set — see PLACEHOLDER_HABITS above) */}
+        {/* ~10 year per-condition risk breakdown, from the same
+            /api/predictions/latest payload as the score and trend.
+            "~10 YEAR" matches the score subtext and the actual
+            RISK_PROJECTION_YEARS = 10 driving the projection — one
+            consistent horizon phrase, not the older "5-10 year" copy */}
+        <Text style={styles.riskHeader}>~10 YEAR RISK BREAKDOWN</Text>
+        {prediction?.risk_breakdown ? (
+          RISK_CONDITIONS.map(({ key, label }) => {
+            const band = prediction.risk_breakdown[key];
+            const segments = RISK_BAND_SEGMENTS[band] || 0;
+            const bandColor = RISK_BAND_COLORS[band] || colors.textMuted;
+            return (
+              <View key={key} style={styles.riskCard}>
+                <View style={styles.riskCardTop}>
+                  <Text style={styles.riskCondition}>{label}</Text>
+                  <Text style={[styles.riskBand, { color: bandColor }]}>
+                    {band || '—'}
+                  </Text>
+                </View>
+                <View style={styles.riskBarRow}>
+                  {[1, 2, 3].map((segment) => (
+                    <View
+                      key={segment}
+                      style={[
+                        styles.riskBarSegment,
+                        segment <= segments && { backgroundColor: bandColor },
+                      ]}
+                    />
+                  ))}
+                </View>
+              </View>
+            );
+          })
+        ) : (
+          <View style={styles.riskEmptyCard}>
+            <Text style={styles.riskEmptyText}>
+              Your risk breakdown appears here once your first assessment is
+              complete
+            </Text>
+          </View>
+        )}
+
+        {/* Gemini's plain-language "why" for the score/bands — stored with the
+            month's habit set. Deliberately visually secondary to the score. */}
+        {reasoning && (
+          <View style={styles.reasoningCard}>
+            <Text style={styles.reasoningLabel}>WHY YOUR SCORE LOOKS THIS WAY</Text>
+            <Text style={styles.reasoningText}>{reasoning}</Text>
+          </View>
+        )}
+
+        {/* Today's habits — read-only summary of the shared checklist state;
+            toggling (and generating) lives on the Habits tab */}
         <View style={styles.habitsHeader}>
           <Text style={styles.sectionTitle}>Today's habits</Text>
-          <Text style={styles.habitsCount}>
-            {completedCount}/{HABITS_PER_DAY} complete
-          </Text>
+          {hasCurrentSet && (
+            <Text style={styles.habitsCount}>
+              {completedCount}/{habits.length} complete
+            </Text>
+          )}
         </View>
-        {PLACEHOLDER_HABITS.map((habit) => (
-          <View key={habit.id} style={styles.habitRow}>
-            <View
-              style={[styles.habitCheck, habit.completed && styles.habitCheckDone]}
-            >
-              {habit.completed && (
-                <Ionicons name="checkmark" size={14} color="#fff" />
-              )}
-            </View>
-            <View style={styles.flex}>
-              <Text
-                style={[styles.habitTitle, habit.completed && styles.habitTitleDone]}
+        {hasCurrentSet ? (
+          habits.map((habit) => (
+            <View key={habit.id} style={styles.habitRow}>
+              <View
+                style={[styles.habitCheck, habit.completed && styles.habitCheckDone]}
               >
-                {habit.title}
-              </Text>
-              <Text style={styles.habitSub}>{habit.subtext}</Text>
+                {habit.completed && (
+                  <Ionicons name="checkmark" size={14} color="#fff" />
+                )}
+              </View>
+              <View style={styles.flex}>
+                <Text
+                  style={[styles.habitTitle, habit.completed && styles.habitTitleDone]}
+                >
+                  {habit.title}
+                </Text>
+                <Text style={styles.habitSub}>{habit.subtext}</Text>
+              </View>
+              <Text style={styles.habitPoints}>+{habit.points}</Text>
             </View>
-            <Text style={styles.habitPoints}>+{habit.points}</Text>
+          ))
+        ) : (
+          <View style={styles.habitsEmptyCard}>
+            <Text style={styles.habitsEmptyText}>
+              No habits for {monthLabel} yet — generate your personalised set on
+              the Habits tab.
+            </Text>
           </View>
-        ))}
+        )}
       </ScrollView>
     </LinearGradient>
   );
@@ -428,6 +506,87 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bold,
     fontSize: 18,
     marginLeft: 6,
+  },
+  riskHeader: {
+    fontFamily: fonts.medium,
+    fontSize: 11,
+    letterSpacing: 1.5,
+    color: colors.textSecondary,
+    marginTop: 6,
+    marginBottom: 12,
+  },
+  riskCard: {
+    ...cardStyle,
+    padding: 16,
+    marginBottom: 10,
+  },
+  riskCardTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  riskCondition: {
+    fontFamily: fonts.semibold,
+    fontSize: 14,
+    color: colors.text,
+  },
+  riskBand: {
+    fontFamily: fonts.semibold,
+    fontSize: 13,
+  },
+  riskBarRow: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  riskBarSegment: {
+    flex: 1,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.border,
+  },
+  riskEmptyCard: {
+    ...cardStyle,
+    padding: 16,
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  riskEmptyText: {
+    fontFamily: fonts.regular,
+    fontSize: 13,
+    color: colors.textMuted,
+    textAlign: 'center',
+  },
+  reasoningCard: {
+    ...cardStyle,
+    padding: 16,
+    marginTop: 4,
+    marginBottom: 24,
+  },
+  reasoningLabel: {
+    fontFamily: fonts.medium,
+    fontSize: 10,
+    letterSpacing: 1.5,
+    color: colors.textSecondary,
+    marginBottom: 8,
+  },
+  reasoningText: {
+    fontFamily: fonts.regular,
+    fontSize: 13,
+    color: colors.textMuted,
+    lineHeight: 20,
+  },
+  habitsEmptyCard: {
+    ...cardStyle,
+    padding: 16,
+    alignItems: 'center',
+  },
+  habitsEmptyText: {
+    fontFamily: fonts.regular,
+    fontSize: 13,
+    color: colors.textMuted,
+    textAlign: 'center',
+    lineHeight: 19,
   },
   habitsHeader: {
     flexDirection: 'row',

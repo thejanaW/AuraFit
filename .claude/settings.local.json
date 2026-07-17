@@ -48,7 +48,8 @@
       "Bash(./venv/bin/uvicorn main:app --port 8000)",
       "Bash(break)",
       "Bash(/Users/thejanaw/Documents/thejana/UNI/AuraFit/ml-service/venv/bin/python *)",
-      "Bash(xargs kill)"
+      "Bash(xargs kill)",
+      "Bash(git -C /Users/thejanaw/Documents/thejana/UNI/AuraFit diff mobile/src/screens/onboarding/OnboardingScreen.js)"
     ]
   }
 }

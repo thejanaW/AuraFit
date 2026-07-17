@@ -12,6 +12,7 @@ export const colors = {
   accent: '#FF5A36',
   accentGlow: 'rgba(255, 90, 54, 0.28)',
   positive: '#4CD97B',
+  warning: '#FFB340', // amber — mid-severity states (e.g. Moderate risk band)
   negative: '#FF5A5F',
   text: '#FFFFFF',
   textSecondary: '#B9B9BF', // labels / subtext — light grey, never pure white

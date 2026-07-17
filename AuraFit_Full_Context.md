@@ -10,29 +10,40 @@
 
 **Full project title:** An Integrated Mobile Platform for Long Term Health Risk Prediction and Sustained Behavioural Change Through Gamified Physical Activity Incentives
 
-The app takes user lifestyle inputs, runs them through a trained ML model to predict 5-10 year, per-condition health risk, visualises overall health through a Digital Twin avatar, and motivates action through a gamified habit checklist and a GPS-based location reward system.
+The app takes user lifestyle inputs, runs them through a trained ML model to predict a ~10-year, per-condition health risk projection, visualises overall health through a Digital Twin avatar, and motivates action through a gamified, AI-personalised habit checklist and a GPS-based location reward system.
 
 ---
 
 ## Core System Logic (Critical)
 
 1. User completes a 7-step onboarding form (personal details, sleep, diet, exercise, lifestyle, habits, health background)
-2. ML model predicts **per-condition risk** (heart attack, heart disease, diabetes, high blood pressure) from a 7-field lifestyle/demographic feature subset — NOT a single combined score
-3. Each condition's risk is shown as a **Low/Moderate/High band** (data-driven tercile cutoffs), NOT a raw percentage — chosen deliberately over percentage display, since AuraFit is a motivational gamified app, not a clinical diagnostic tool, and bands avoid the false precision of an inflated raw probability while matching the avatar's tier-based design. This is a documented, justified decision for the dissertation reflective report.
-4. An overall health score (0-100) is derived as a weighted summary of the 4 individual risk levels (heart attack 0.30, heart disease 0.30, diabetes 0.20, high BP 0.20 — cardiac conditions weighted higher as rarer/more severe)
-5. The avatar's **starting tier at onboarding is based on this real predicted score** (poor score → Level 0, good score → higher tiers) — NOT a fixed starting tier, and tier boundaries/count still to be decided once real score distributions are visible in Chunk 3.
-6. After onboarding, the avatar's ongoing growth is driven by habit streaks and app consistency — NOT by continuous re-scoring
-7. The system generates a personalised daily habit checklist using Gemini, based on the per-condition risk breakdown PLUS the personalisation-only lifestyle fields (see below)
-8. The per-condition risk breakdown (the "possible diseases in 5-10 years" view) is also meant to be directly visible to the user — this is a Chunk 3 UI task, not yet built. Decision needed: shown directly on the Home/Avatar dashboard, or in a separate detail screen one tap away.
-9. Completing habits earns points and grows the avatar's progression level
-10. GPS reward map is a separate, complementary earning mechanism — users visit pinned locations to claim rewards from local brands, which also earns points
-11. Both earning paths (habits + GPS) feed into avatar progression, but avatar progression is tracked **separately** from the ML-predicted health score
+2. Before scoring, the user's real age is **projected forward by +10 years** (`RISK_PROJECTION_YEARS = 10` in `onboardingPayloads.js`) when computing `age_group` — every other feature (BMI, exercise, smoking, etc.) uses the person's real current values. This reframes the score as "where you'd land in ~10 years if these habits continued."
+3. ML model predicts **per-condition risk** (heart attack, heart disease, diabetes, high blood pressure) from a 7-field lifestyle/demographic feature subset — NOT a single combined score
+4. Each condition's risk is shown as a **Low/Moderate/High band**, NOT a raw percentage. Bands are **age-sensitive (peer-relative)**: tercile cutoffs are calculated separately within each of 4 life-stage buckets (18-34, 35-49, 50-64, 65+ — mapped from BRFSS `_AGEG5YR` bands 1-3, 4-6, 7-9, 10-13), not globally. See "Key Findings" below for the full investigation that led here.
+5. The overall health score (0-100) uses the **same age-bucket-relative thresholds** as the bands (kept consistent deliberately — a global score next to peer-relative bands would look contradictory). Scores compress toward the middle within a bucket — e.g. a maximally healthy young profile scores ~71, a maximally unhealthy young profile ~31, both within the 18-34 bucket. Scores are not comparable across the methodology change (old test rows were cleared for this reason).
+6. **Score reasoning:** alongside habit generation (see point 9), Gemini also generates a short (2-3 sentence) plain-language explanation of why the user's risk breakdown looks the way it does — motivational and factual, explicitly not clinical/alarming, framed as a risk indicator not a diagnosis. Displayed on Home as a "WHY YOUR SCORE LOOKS THIS WAY" card under the risk breakdown.
+7. **Risk Breakdown display** is live on the Home dashboard — four cards (Heart Attack, Heart Disease, Diabetes, High Blood Pressure — deliberately relabeled from the Figma design's mismatched categories like "Cardiovascular"/"Mental Wellbeing" to match the model's actual outputs), each showing the band label and a 3-segment colored bar (green/amber/red for Low/Moderate/High).
+8. The avatar's **starting tier at onboarding is based on this real predicted score** — NOT a fixed starting tier. Tier boundaries still undecided; must be calibrated against the peer-relative score range once the avatar is built.
+9. **Habit generation is now fully built and Gemini-powered, with monthly progressive difficulty:**
+   - User must manually tap "Generate this month's habits" (no automatic/background generation) — button shows only when no habit set exists yet for the current calendar month
+   - Backend gathers: latest prediction (risk_breakdown), health_inputs (personalisation-only fields), and — if a previous month's set exists — that set's habits plus their actual completion rates
+   - Sends this to Gemini, which returns exactly 5 habits (title, subtext, points 15-30) plus the score reasoning, as strict JSON (no markdown/preamble)
+   - **Progressive difficulty logic, applied per-habit based on the PREVIOUS month's completion rate for that specific habit:** >80% completion → slightly harder version of the same habit (e.g. step count or duration increased modestly); <40% completion → same or easier; moderate (40-80%) → roughly unchanged. Verified working in testing (e.g. a 90%-completed "walk 5,000 steps" became "walk 6,000 steps"; a 27%-completed "drink 2L water" became "drink 1.5 liters")
+   - **Fallback system:** if the Gemini call fails for ANY reason (API error/timeout, invalid JSON, missing fields), the backend silently substitutes the original hardcoded 5-habit list from `mobile/src/constants/habits.js` plus a generic reasoning string. This still gets saved as that month's official set, tagged `source: 'fallback'` internally (vs `source: 'gemini'`) so it's distinguishable in the database. A real Gemini capacity outage triggered this fallback path during testing, confirming it works under real conditions.
+   - **Known limitation:** because a month "locks in" whatever was generated, a fallback-sourced set persists for the whole month with no automatic retry — the only current fix is manually deleting that month's `habit_sets` row in Supabase to allow regeneration. Worth considering an explicit "regenerate" option for fallback-sourced sets as a future enhancement.
+   - A second generate call within the same month correctly returns the existing set (`alreadyExisted: true`) rather than creating duplicates
+10. Both Home and the Habits tab read from a shared `HabitsContext` so completion state stays in sync between screens instantly while both are mounted
+11. Completing a habit awards its exact points value; un-completing removes the matching points row; duplicate completes don't double-award; unknown habit IDs 404. All verified end-to-end (17/17 checks) against the live backend, Supabase, and real Gemini API.
+12. **Streak — about to be built** (next planned item): counts consecutive days with at least one habit completed (forgiving definition — not all 5 required), breaking only once a full day has passed with zero completions; today's in-progress state doesn't break the streak prematurely.
+13. **Planned enhancement, deliberately deferred (not yet built):** step-count auto-tracking via the phone's built-in pedometer (`expo-sensors` Pedometer API — no ejecting from Expo managed workflow required). Would only auto-verify step-based habits specifically; all other habit types (water, sleep, diet, smoking, etc.) have no phone-sensor equivalent and still need manual completion. Requires physical device testing (iOS Simulator has no real accelerometer). Deferred to Chunk 3 wrap-up or Chunk 5 polish, not built now.
+14. After onboarding, avatar progression is meant to be driven by habit streaks and app consistency — NOT by continuous re-scoring. **Avatar progression tracking (points/level system) is deliberately deferred alongside the avatar itself** — will be built together, not separately, since tier boundaries need calibrating against the avatar once it exists.
+15. GPS reward map (Chunk 4) is a separate, complementary earning mechanism — not yet started.
 
 **Two distinct values, stored separately:**
 - `predicted_health_score` — ML-derived, mostly static, updated only on rare re-assessment
-- `avatar_progression_level` — gamified, dynamic, grows with habit streaks/GPS activity
+- `avatar_progression_level` — gamified, dynamic, grows with habit streaks/GPS activity (not yet implemented)
 
-**Critical development path:** Auth → ML risk prediction (per-condition) → Onboarding form collects real data → Avatar renders starting tier from score → Habits + GPS both earn points → Avatar progression grows independently. Each phase unlocks the next.
+**Critical development path:** Auth → ML risk prediction (per-condition, age-projected, peer-relative) → Onboarding → Home dashboard (score, risk breakdown, reasoning) → Habits (Gemini-generated, monthly progressive) → Streak (next) → Avatar + avatar progression (deferred) → GPS rewards (Chunk 4).
 
 ---
 
@@ -41,11 +52,12 @@ The app takes user lifestyle inputs, runs them through a trained ML model to pre
 | Layer | Technology |
 |---|---|
 | Mobile | React Native with Expo |
-| Maps & GPS | React Native Maps + Expo Location |
-| Avatar/Animation | Lottie / React Native Skia (SVG-based) |
+| Maps & GPS | React Native Maps + Expo Location (Chunk 4, not started) |
+| Avatar/Animation | Deferred — likely short looping video per tier (same solid background color as dashboard to fake transparency), not Lottie/Skia. Not yet built. |
+| Step tracking | Planned, deferred — `expo-sensors` Pedometer API |
 | Backend API | Node.js with Express |
 | ML Microservice | Python with FastAPI + scikit-learn |
-| Habit Generation | Gemini API (Google AI Studio) |
+| Habit Generation + Score Reasoning | Gemini API (Google Generative AI, Google AI Studio) — fully built, single combined call, with fallback |
 | Database | PostgreSQL with PostGIS (via Supabase) |
 | Auth | Supabase (JWT-based) |
 | Version Control | Git / GitHub (private repo) |
@@ -59,27 +71,41 @@ The app takes user lifestyle inputs, runs them through a trained ML model to pre
 AuraFit/
 ├── mobile/
 │   ├── src/
-│   │   ├── components/onboarding/   # StepScreen, OptionPill, FormField, card selectors, sliders, toggles
-│   │   ├── context/OnboardingContext.js
-│   │   ├── screens/onboarding/      # OnboardingScreen.js (step registry) + steps/Step1Basics.js ... Step7HealthBackground.js
-│   │   ├── utils/onboardingPayloads.js   # BRFSS mapping layer
-│   │   └── theme.js                 # design tokens (colors, fonts)
+│   │   ├── components/onboarding/   # StepScreen, OptionPill, FormField, SliderField, card selectors, toggles
+│   │   ├── constants/habits.js      # fallback 5-habit list — kept permanently as the Gemini fallback source
+│   │   ├── context/
+│   │   │   ├── OnboardingContext.js
+│   │   │   └── HabitsContext.js     # shared live habit/completion state across Home + Habits tab
+│   │   ├── screens/
+│   │   │   ├── HomeScreen.js         # score, points, streak (stubbed), trend, risk breakdown, reasoning card, habits
+│   │   │   ├── HabitsScreen.js       # full habit checklist + "Generate this month's habits" button
+│   │   │   └── onboarding/           # OnboardingScreen.js (step registry) + steps/Step1Basics.js ... Step7Health.js
+│   │   ├── utils/onboardingPayloads.js   # BRFSS mapping layer + age projection logic
+│   │   └── theme.js                 # design tokens (lightened cards, warning amber token added)
 ├── backend/
-│   ├── src/routes/predictions.js
-│   ├── src/routes/health-inputs.js
+│   ├── src/
+│   │   ├── constants/                # backend-side habit fallback reference (mirrors mobile's)
+│   │   ├── services/                 # Gemini API integration logic
+│   │   └── routes/
+│   │       ├── predictions.js        # POST /api/predictions, GET /api/predictions/latest
+│   │       ├── health-inputs.js
+│   │       ├── points.js             # GET /api/points/total
+│   │       └── habits.js             # GET /api/habits/today, POST /api/habits/complete, POST /api/habits/generate
 │   └── migrations/
 │       ├── 002_predictions_multilabel.sql
-│       └── 003_health_inputs_expanded.sql
+│       ├── 003_health_inputs_expanded.sql
+│       └── 004_habit_sets.sql        # habit_sets table + habit_item_id reference on habits table
 ├── ml-service/
 │   ├── data/
-│   │   ├── raw/         # gitignored — BRFSS XPT + codebook, not committed
-│   │   ├── processed/   # brfss_2023_trimmed.csv, brfss_2023_model_ready.csv
+│   │   ├── raw/         # gitignored
+│   │   ├── processed/
 │   │   ├── extract_brfss.py
 │   │   └── build_model_ready.py
-│   ├── models/           # 4 .pkl models, preprocessor.pkl, risk_band_thresholds.json
+│   ├── scratchpad/age_sufficiency_check.py
+│   ├── models/           # 4 .pkl models, preprocessor.pkl, risk_band_thresholds.json (nested by age bucket)
 │   ├── train_models.py
 │   ├── define_risk_bands.py
-│   ├── main.py            # FastAPI app: POST /predict, GET /health
+│   ├── main.py            # FastAPI app: POST /predict (age-bucket-aware banding), GET /health
 │   └── venv/        # gitignored
 └── AuraFit_Full_Context.md
 ```
@@ -89,68 +115,58 @@ AuraFit/
 ## Five Chunk Build Plan
 
 ### Chunk 1 — Foundation & Auth ✅ COMPLETE
-Supabase schema with RLS + PostGIS GIST index, JWT auth API, Expo shell with tab navigation, Login/Register screens. Verified end-to-end on iOS simulator.
 
 ### Chunk 2 — ML Microservice ✅ COMPLETE
+Dataset (BRFSS 2023, 297,703 model-ready rows), 4 trained Logistic Regression models (ROC-AUC 0.78-0.83), FastAPI service, backend integration, full 7-step onboarding form.
 
-**Dataset:** 2023 BRFSS (CDC), SAS Transport (XPT) format. 433,323 raw respondents → trimmed to 13 relevant columns → cleaned to 297,703 model-ready rows (68.7% retention; dropped rows had missing BMI, unanswered exercise module, or don't-know/refused diagnosis codes — all documented as a dissertation data-prep note, not a red flag).
+### Chunk 3 — Avatar & Habit System — IN PROGRESS (core nearly complete)
 
-**Model-training features (7, lifestyle/demographic only):** age_group, sex, bmi, physical_activity_cat, smoking_status, heavy_drinker, general_health
+**Completed:**
+- Home dashboard (score + "~10 years" projection subtext, points, trend card, risk breakdown with 4 correctly-labeled condition cards, score reasoning card, habits section)
+- Habits tab — fully functional checklist with real persistence, points award/removal, "Generate this month's habits" flow
+- Step 7 slider default-value bug fixed (was silently submitting an unanswered "Good" rating)
+- +10 year age projection implemented
+- Risk bands rebuilt as age-sensitive (4 life-stage buckets) after data-sufficiency analysis — see Key Findings
+- General health slider UX improved with descriptive per-value anchors
+- **Gemini habit generation, fully built and verified end-to-end (17/17 checks):** monthly progressive difficulty based on real per-habit completion history, combined score reasoning generation, fallback system for Gemini failures (verified against a real capacity outage during testing), `habit_sets` table (migration 004) with `habit_item_id` properly referenced by the `habits` completion table
+- All Chunk 3 work through this point committed to Git
 
-**Sex is binary only (Male/Female)** — no "Other" option and no separate sex-at-birth question. BRFSS SEXVAR is binary, so this keeps every input mapping direct and accurate rather than needing a workaround. Decided deliberately, not a limitation to flag.
+**Next planned item:** Streak tracking — counts consecutive days with ≥1 habit completed; in-progress "today" doesn't break the streak; breaks only after a full day passes with zero completions. Not yet built.
 
-**Target labels (4 separate binary columns, multi-label classification):** target_heart_attack (5.4% positive), target_heart_disease (5.7%), target_diabetes (15.9%, includes pre-diabetes), target_high_bp (40.8%) — built FROM diagnosis columns, NEVER used as input features (avoids the model trivially "reading its own answer").
+**Deliberately deferred (not blocking, no urgent timeline):**
+- Avatar — likely short looping video per tier, matching dashboard background color; needs tier boundaries calibrated against the peer-relative score range once built
+- Avatar progression tracking (points/level system, `avatar_progression` table) — to be built alongside the avatar, not separately
+- Step-count auto-tracking via phone pedometer — noted as a planned enhancement, deferred to Chunk 3 wrap-up or Chunk 5
 
-**Fields with no BRFSS equivalent** (sleep hours, fruit/veg intake) moved to personalisation-only, feeding Chunk 3's Gemini habit generation instead of the model. "Family history" reframed as "existing diagnosed heart condition" (BRFSS only captures the respondent's own diagnosis history).
-
-**Models trained:** 4 separate Logistic Regression classifiers (`class_weight="balanced"` given the class imbalance), one per condition. Test-set results (59,541 held-out rows): ROC-AUC 0.78-0.83 across all 4 conditions — a strong result from just 7 self-reported lifestyle features. Precision is low on the two heart targets (~0.13-0.15) as an expected, documented trade-off of class balancing on a ~5%-positive label; recall (~77-79%) and AUC are the headline metrics for this use case, not raw accuracy or precision at the 0.5 threshold.
-
-**Display decision: Low/Moderate/High risk bands, NOT raw percentages.** Raw probabilities are inflated by class balancing (not real-world probabilities), so rather than calibrating them (considered, and viable via `CalibratedClassifierCV`, but not pursued), the team went with data-driven tercile cutoffs per condition (saved in `risk_band_thresholds.json`). Validated: each condition shows a clean monotonic climb in actual diagnosis rate from Low→Moderate→High (e.g. diabetes: 2.5% → 11.9% → 33.3%). This is deliberately justified in the reflective report as the right choice for a motivational, non-clinical app — avoids false precision, matches the avatar's tier-based design.
-
-**Random Forest comparison: deliberately deferred**, not abandoned. Logistic Regression's results are already strong and defensible as a final model; a Random Forest comparison remains a nice-to-have for the evaluation chapter, to be revisited after the full app is built end-to-end. Because the FastAPI endpoint treats the model as a swappable "black box" (same input/output contract regardless of what's inside), adding this later requires no changes to the app, backend, or avatar/habit logic — only a new `.pkl` file and pointing the endpoint at it.
-
-**FastAPI service (`ml-service/main.py`):** POST `/predict` takes the 7 features, returns `overall_health_score` (0-100, weighted percentile-based combination — documented in-code for the dissertation) plus a `risk_breakdown` (Low/Moderate/High per condition) plus `raw_probabilities` (needed only to fill Supabase's float columns; explicitly flagged in the response as balance-inflated and not for UI display). GET `/health` confirms all 4 models loaded. Tested with healthy/high-risk/mixed/garbage-input profiles — all behaved correctly, including clean 422 validation errors.
-
-**Backend integration:** JWT-authed `POST /api/predictions` (in `backend/src/routes/predictions.js`) calls the FastAPI service, distinguishes "service unreachable" (503) from "service errored" (502), inserts the result into Supabase's `predictions` table for the authenticated user. `ML_SERVICE_URL` env var added. Migration `002_predictions_multilabel.sql` rebuilt the table for the 4-target shape (previously had the old Chunk-1 single-score shape).
-
-**Onboarding form — built as 7 steps, all complete and tested end-to-end:**
-1. Basics — age, height, weight, gender (Female/Male only)
-2. Sleep — hours (slider), sleep quality (1-5)
-3. Diet — diet type (4-option cards), water intake, meals per day
-4. Movement — exercise frequency (4-option cards, feeds the model via physical_activity_cat), exercise types (multi-select, personalisation-only)
-5. Lifestyle — stress level (1-10 slider), work hours/day, screen time
-6. Habits — smoking status (4-option cards, feeds the model), alcohol asked as **frequency + typical amount separately** (not a single "drinks per week" number, to avoid forcing infrequent drinkers into awkward fractional input) — the app calculates an estimated weekly average behind the scenes using documented frequency-to-multiplier assumptions, then feeds that into the existing sex-specific heavy-drinker threshold (>14/week men, >7/week women)
-7. Health Background — general self-rated health (1-5 slider, feeds the model), three Yes/No diagnosis toggles (existing heart condition, high BP, diabetes/pre-diabetes) — saved to `health_inputs` for completeness but NOT sent to `/predict` (per the feature/target separation rule)
-
-Shared architecture: `StepScreen` wrapper (progress bar, step counter, back button, Continue/Finish button with loading state), `OnboardingContext` (all answers persist across steps, so back navigation never loses data), reusable card-selectors, sliders, pill-tag multi-selects, and Yes/No toggles. `onboardingPayloads.js` is the BRFSS mapping layer — converts raw form answers into the exact coded values the model expects (age bands, BMI calculation, activity categories, smoking categories, calculated heavy-drinker flag, general health rating).
-
-On Step 7 "Finish": submits personalisation-only fields to `POST /api/health-inputs` (backend route + migration `003_health_inputs_expanded.sql`, since the live table had the old Chunk-1 placeholder shape) and the 7 model fields to `POST /api/predictions`, then navigates into the main app.
-
-**Full pipeline tested and confirmed working end-to-end:** real onboarding answers → FastAPI prediction → Supabase storage, via the actual mobile app (not just curl).
-
-**Known TODO (not blocking):** onboarding currently shows on every login; needs a "has this user already onboarded" check (e.g. a `GET /api/predictions/latest` call) before real use — flagged in `AppNavigator.js`.
-
-### Chunk 3 — Avatar & Habit System — NEXT
-**Needs:** Chunk 2 complete (✅), Figma designs for Home/Avatar dashboard and habit screens (not yet supplied — check before starting)
-
-**Build:**
-- Digital Twin avatar component (Lottie or React Native Skia) — motivational visualisation only, NOT a physical likeness of the user
-- Avatar starting tier set from the real predicted health score at onboarding — score-based, not fixed. Exact tier boundaries/count still to be decided once real score distributions are visible.
-- **Per-condition risk breakdown display** — the "possible diseases in 5-10 years" view (matches the pre-onboarding walkthrough copy: "AuraFit predicts your 5-10 year health risks"). This data already exists in Supabase from Chunk 2 but has no UI yet. Decision needed: shown directly on the Home/Avatar dashboard, or in a separate detail screen one tap away.
-- Subsequent avatar growth driven by habit streaks/app consistency, tracked as a separate `avatar_progression_level` value distinct from `predicted_health_score`
-- Personalised daily habit checklist generated via Gemini API, using: the per-condition risk breakdown + personalisation-only fields (sleep quality, diet type, meals/day, water intake, exercise types, stress level, work hours, screen time)
-- Gemini prompt should request structured JSON habits; parsing must include try/catch with fallback default habits
-- Habit completion logic (marks done, awards points)
-- Points stored in Supabase, feeding avatar progression
-
-**Unlocks:** Core gamification loop is live.
+**Known TODOs (not blocking, tracked for later, likely Chunk 5):**
+- Onboarding shows on every login; needs a "has this user already onboarded" check
+- User's real name isn't stored — Register screen collects a name but there's no `name` column in `users`; Home's greeting derives a name from the email prefix instead
+- Profile icon currently acts as a logout button (no real Profile screen built yet)
+- Fallback-sourced monthly habit sets have no in-app "regenerate" option; requires manual Supabase intervention
 
 ### Chunk 4 — GPS Reward Map
-**Needs:** Chunk 3 complete, PostGIS enabled in Supabase (already done, plain postgis extension with GIST spatial index)
-**Build:** Map screen (React Native Maps), seed reward pins, proximity check (20-30m radius via PostGIS), claim reward API endpoint, points awarded on claim → feeds avatar progression, brand reward display UI.
+Not started. Map screen (React Native Maps), seed reward pins, proximity check (20-30m radius via PostGIS), claim reward API endpoint, points awarded on claim → feeds avatar progression, brand reward display UI.
 
 ### Chunk 5 — Polish, Testing & Dissertation
-UAT test cases, bug fixes, UI polish to match Figma designs pixel-perfectly, dissertation Chapters 3 and 4 write-up, five diagrams (System Architecture, Use Case, ER/Database Schema, Sequence for ML prediction loop, Avatar State), final submission prep.
+UAT test cases, bug fixes, UI polish to match Figma designs pixel-perfectly, onboarding-every-login fix, dissertation Chapters 3 and 4 write-up, five diagrams (System Architecture, Use Case, ER/Database Schema, Sequence for ML prediction loop, Avatar State), final submission prep. Candidate home for step-count auto-tracking and Profile screen if not done earlier.
+
+---
+
+## Key Findings — Age-Sensitivity Investigation (important dissertation material)
+
+**The problem:** BRFSS is cross-sectional, so the trained model learned "probability this lifestyle profile currently has a diagnosed condition," not future risk. Young respondents rarely have diagnoses yet regardless of habits, so age alone dominated the score — a test profile (22yo, BMI 31.6, daily smoker, inactive) scored 84-90 (clearly wrong), while identical habits at 58 correctly scored 11.
+
+**First fix — age projection alone (+10 years):** legitimate "synthetic cohort" technique, moved score in the right direction (84→74) but didn't flip any condition out of "Low," since global risk bands were still calculated across the whole adult population.
+
+**Second fix — age-sensitive (peer-relative) risk bands:** tercile cutoffs now calculated separately within 4 life-stage buckets (18-34, 35-49, 50-64, 65+), justified by a data-sufficiency check (heart attack prevalence spreads ~19x across buckets; finer 13-band granularity would have had cells too thin to validate reliably, e.g. 25-29/heart disease at only 45 total positives).
+
+**Combined result:** same 22yo unhealthy male now scores ~31 with High bands on all four conditions; a genuinely healthy young profile still correctly scores ~71, all Low.
+
+**Honestly-reported wrinkle:** 18-34/heart attack showed a minor non-monotonic blip (0.3%→0.2%→1.0%) between Low/Moderate terciles due to small sample sizes (10 vs 8 positive cases) — the High band still separated cleanly. Confirms 4 buckets was the minimum safe granularity, not over-cautious.
+
+**Known consequence:** scores now compress toward the middle within each bucket (peer-relative), so pre/post-change scores aren't comparable — old test rows were cleared from Supabase for this reason.
+
+**Real-world confirmation during later testing:** an occasional ("some days") smoker with an otherwise good profile scored Heart Attack "High" — initially surprising, but traced to two compounding factors: (1) even occasional smoking carries real documented cardiovascular risk, and (2) this profile fell in the 18-34/heart attack bucket, the specific combination already flagged above as having the most fragile Low/Moderate boundary. This is treated as a validated instance of an already-documented limitation, not a new bug — smoking mapping itself was independently verified correct (some_days → BRFSS code 2, distinct from every_day → 1).
 
 ---
 
@@ -158,30 +174,30 @@ UAT test cases, bug fixes, UI polish to match Figma designs pixel-perfectly, dis
 
 | Role | Fields |
 |---|---|
-| **Model-training features** (sent to `/predict`) | Age (→age_group), Height/Weight (→BMI), Gender (→sex, binary only), Exercise frequency (→physical_activity_cat), Smoking status, Calculated heavy-drinker flag (from alcohol frequency × amount), General self-rated health |
-| **Used only to build target labels in training data** (not live model inputs) | N/A at prediction time — this only applied during Chunk 2's historical dataset labelling, not to live onboarding answers |
-| **Personalisation-only** (saved to `health_inputs`, feed Gemini in Chunk 3, not the ML model) | Sleep hours, Sleep quality, Diet type, Meals per day, Water intake, Exercise types, Stress level, Work hours/day, Screen time, Existing heart condition (Y/N), High BP diagnosis (Y/N), Diabetes diagnosis (Y/N) |
-
-Note: the three diagnosis Yes/No questions in Step 7 are collected and stored for completeness/future use, but are NOT sent to the live `/predict` call, since only `general_health` from that step feeds the model (per the strict feature/target separation established in Chunk 2).
+| **Model-training features** (sent to `/predict`) | Age (→ +10yr projected age_group), Height/Weight (→BMI), Gender (→sex, binary only), Exercise frequency (→physical_activity_cat), Smoking status, Calculated heavy-drinker flag, General self-rated health (with descriptive anchors) |
+| **Personalisation-only** (saved to `health_inputs`, feed Gemini, not the ML model) | Sleep hours, Sleep quality, Diet type, Meals per day, Water intake, Exercise types, Stress level, Work hours/day, Screen time, Existing heart condition (Y/N), High BP diagnosis (Y/N), Diabetes diagnosis (Y/N) |
 
 ---
 
 ## Database Schema (Supabase / PostgreSQL)
 
 ### users
-id (uuid, pk), email (text, unique), created_at
+id (uuid, pk), email (text, unique), created_at — **no `name` column yet** (TODO)
 
-### health_inputs (rebuilt via migration 003)
+### health_inputs (migration 003)
 id (uuid, pk), user_id (fk), sleep_hours, sleep_quality, diet_type, meals_per_day, water_intake, exercise_frequency, exercise_types (text[]), stress_level, work_hours, screen_time, alcohol_frequency, drinks_per_occasion, smoking_status, existing_heart_condition (bool), high_bp_diagnosis (bool), diabetes_diagnosis (bool), general_health_rating, created_at
 
-### predictions (rebuilt via migration 002)
-id (uuid, pk), user_id (fk), predicted_health_score (float, 0-100), heart_attack_risk (float), heart_disease_risk (float), diabetes_risk (float), high_bp_risk (float), risk_breakdown (jsonb — Low/Moderate/High per condition), created_at
+### predictions (migration 002)
+id (uuid, pk), user_id (fk), predicted_health_score (float, age-bucket-relative), heart_attack_risk/heart_disease_risk/diabetes_risk/high_bp_risk (float, raw/inflated — not for UI), risk_breakdown (jsonb — Low/Moderate/High per condition, age-bucket-relative), created_at
 
-### avatar_progression (new table, not yet built — Chunk 3)
+### habit_sets (NEW — migration 004)
+id (uuid, pk), user_id (fk), month (identifies which calendar month this set belongs to), source (text: 'gemini' | 'fallback'), reasoning (text — the score explanation), created_at. Contains the 5 generated habits (title, subtext, points_value) for that month — exact column/JSON structure per migration 004.
+
+### habits (updated — migration 004 added habit_item_id)
+id (uuid, pk), user_id (fk), habit_item_id (NEW — references the specific habit within a habit_sets row, replaces the old title-matching approach), title, completed (bool), date, points_value (int)
+
+### avatar_progression (not yet created — deferred with the avatar)
 id (uuid, pk), user_id (fk), avatar_progression_level (int), updated_at
-
-### habits
-id (uuid, pk), user_id (fk), title, completed (bool), date, points_value (int)
 
 ### points
 id (uuid, pk), user_id (fk), amount (int), source (text: habit/gps), created_at
@@ -192,41 +208,45 @@ id (uuid, pk), brand_name, description, location (geometry, PostGIS point, GIST 
 ---
 
 ## Supabase Setup (Already Done)
-Project: AuraFit, Asia-Pacific region. RLS enabled on all tables. PostGIS extension enabled with GIST spatial index on `reward_pins.location`.
+Project: AuraFit, Asia-Pacific region. RLS enabled on all tables. PostGIS extension enabled with GIST spatial index on `reward_pins.location`. `predictions`/`health_inputs` test rows were cleared once during the age-sensitivity methodology change (pre-change scores weren't comparable to post-change ones).
 
 ---
 
 ## Design Direction
-Dark theme, #FF5A36 accent, Poppins font exclusively. Card-based layout, circular progress rings, bold stat numbers, raised centre tab bar button. Pre-onboarding walkthrough (3 frames: "See your future self" / "Change it with habits" / "Earn real rewards") establishes the core value prop and should inform Chunk 3's tone. Onboarding is 7 steps (expanded from an initial 5-step Figma design after finding 3 model-required fields — smoking, alcohol, general health — had no screens); Steps 6-7 were built without Figma references, matching the established visual pattern (progress bar, step counter, "STEP 0X · CATEGORY" label, card-selectors, sliders, pill buttons).
+Dark theme, #FF5A36 accent, Poppins font exclusively. Cards `#1C1C1E` background, `#2C2C2E` borders, soft shadows (lightened per user feedback from the original all-black theme). New `warning: '#FFB340'` amber token added for Moderate risk bands; Low reuses existing green, High reuses existing red.
 
-**Figma MCP note:** generates standalone FigJam files, not new pages within an existing Figma file — manual consolidation needed.
+Figma screens exist for: pre-onboarding walkthrough, account creation, onboarding Steps 1-5, Habits tab (original), Home dashboard (original darker version), Risk Breakdown/Profile screen. The Figma Risk Breakdown screen's categories (Cardiovascular, Type 2 Diabetes, Mental Wellbeing, Musculoskeletal) don't match the model's actual 4 conditions — deliberately relabeled to Heart Attack / Heart Disease / Diabetes / High Blood Pressure instead.
+
+**Figma MCP note:** generates standalone FigJam files, not new pages within an existing Figma file.
 
 ---
 
-## Avatar — Important Framing
-The Digital Twin avatar is a **health visualisation tool only** — not a physical likeness of the user. Starting tier is **score-based at onboarding**, not fixed. `predicted_health_score` (ML-derived) and `avatar_progression_level` (gamified) are tracked as two separate values. Health risk predictions are risk indicators, not clinical diagnoses. Always frame avatar changes as reflecting health trends, not predicting appearance.
+## Avatar — Important Framing & Current Plan
+Health visualisation tool only — not a physical likeness of the user. Deliberately deferred. When built: likely short looping video clips per tier (handles subtle movement naturally), rendered on the same solid background color as the dashboard to avoid needing true video transparency. Starting tier will be score-based, calibrated against the peer-relative score range (~31-71ish within a bucket). Avatar progression tracking will be built at the same time, not before.
 
 ---
 
 ## Development Principles
 - Go one step at a time; explain what each step does in plain language
-- Raw datasets and virtual environments are never committed to Git (`.gitignore`)
-- Build one onboarding step at a time, confirm against design before moving to the next
+- Raw datasets and virtual environments are never committed to Git
+- Build one screen/feature at a time, confirm against design or spec before moving to the next
 - RLS policies written alongside each table, not added later
+- Before committing, always run `git status` (and `git add --dry-run .` if unsure)
 
 ---
 
 ## Key Learnings & Principles
-- Gemini API is for habit generation only — never a substitute for the built-and-evaluated scikit-learn model, which is the core dissertation requirement
-- BRFSS captures the respondent's own condition history, not family history — form fields worded accordingly
-- Fields with no BRFSS equivalent belong in the personalisation/habit-generation pipeline, not forced into model training
-- Always separate model input features from columns used only to construct target labels, to avoid the model trivially "reading its own answer" — this applies at both training time (target columns) and live prediction time (diagnosis Yes/No answers collected but not sent to `/predict`)
-- Raw probabilities from class-balanced models are inflated relative to true prevalence — don't display them directly; use percentile-based bands or calibration, and justify the choice explicitly for the dissertation
-- Keep the ML model "swappable" behind a stable API contract (same input/output shape) — makes future model comparisons (e.g. Random Forest) a drop-in change, not a system rework
-- When a UX choice would force awkward user input (e.g. fractional "drinks per week" for infrequent drinkers), split into frequency + amount and calculate the derived value in code, documenting the assumption for the dissertation
-- Binary-only fields (like BRFSS's sex variable) are more defensible when the app's own input matches the dataset's actual categories directly, rather than introducing a mapping workaround for an option the source data can't represent
-- Use `npx expo` rather than global expo-cli; clear Expo cache (`--clear`) after `.env` changes; `Cmd+R` or `r` in terminal reloads the app without a full restart — only needed for `.env`/native dependency changes
-- Git incident precedent: raw datasets accidentally committed can be undone via `git reset --soft HEAD~1` before pushing, followed by proper `.gitignore` entries
+- Gemini API handles habit generation AND score reasoning in one combined call — never a substitute for the scikit-learn model itself
+- Cross-sectional survey data (BRFSS) captures current diagnosis prevalence, not future risk — age dominates predictions unless deliberately corrected for
+- Age-shifting the input alone is not sufficient without also making the surrounding risk-band thresholds peer-relative — the two techniques need to work together
+- Before choosing statistical cohort/bucket granularity, run an explicit data-sufficiency check (including per-bin sizes after any further split like terciles), don't assume finer is always better
+- A silently pre-filled form default can be worse than an empty field, especially for heavily-weighted model inputs — require explicit interaction before allowing progression
+- Ambiguous self-report scales need concrete behavioural anchors per value to get consistent, accurate answers across equally-healthy respondents
+- AI-generated content (habits, reasoning) always needs a deterministic fallback path for API failures/malformed responses — verified valuable in practice, not just theoretical, when a real Gemini outage occurred during testing
+- When a feature "locks in" a result for a period (e.g. monthly habit generation), consider whether users need a manual override/retry path for when the fallback triggered undesirably
+- When a scoring methodology changes meaningfully, clear out old data rows using the previous methodology (in dev/test environments) rather than letting incomparable values coexist
+- Use `npx expo` rather than global expo-cli; clear Expo cache (`--clear`) after `.env` changes
+- Git incident precedent: raw datasets accidentally committed can be undone via `git reset --soft HEAD~1` before pushing
 
 ---
 
@@ -236,13 +256,14 @@ Agile — five iterative sprints. Dissertation writing runs in parallel from Spr
 ---
 
 ## Tools in Use
-Claude Code (VS Code), Supabase (DB/auth/PostGIS), Expo/npx expo, eas-cli, Homebrew + Node 18.20.8 (Mac, Apple Silicon), Figma (UI + dissertation diagrams), GitHub (private repo), BRFSS 2023 (CDC, ML training data), Gemini API (Chunk 3 habit generation).
+Claude Code (VS Code), Supabase (DB/auth/PostGIS), Expo/npx expo, eas-cli, Homebrew + Node 18.20.8 (Mac, Apple Silicon), Figma, GitHub (private repo), BRFSS 2023 (CDC), Gemini API (Google Generative AI, Google AI Studio).
 
 ---
 
 ## Current Status
 
 **Chunk 1:** Complete.
-**Chunk 2:** Complete. Dataset, 4 trained models, FastAPI service, backend integration, and full 7-step onboarding form all built and tested end-to-end — real onboarding answers now flow through to a stored prediction via the actual mobile app.
+**Chunk 2:** Complete.
+**Chunk 3:** Core build complete — Home dashboard, risk breakdown, Habits tab, and Gemini-powered monthly-progressive habit generation with score reasoning and a verified fallback system are all built, tested (17/17 e2e checks), and committed to Git. Streak tracking is the next planned item. Avatar and avatar progression tracking remain deliberately deferred until built together. Step-count auto-tracking noted as a future enhancement.
 
-**Next action:** Begin Chunk 3 (Avatar & Habit System). Check for Figma designs of the Home/Avatar dashboard and habit checklist screens before starting. First decision needed: where the per-condition risk breakdown ("5-10 year disease risk" view) is displayed — on the main dashboard or a separate detail screen.
+**Next action:** Build streak tracking (GET /api/streak, consecutive-days-with-≥1-completion logic, Home dashboard wiring). After that, Chunk 3's buildable scope is complete except for the avatar itself.

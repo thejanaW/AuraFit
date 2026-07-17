@@ -49,4 +49,32 @@ export const api = {
 
   // Returns { total } — lifetime points sum for the authed user.
   getPointsTotal: () => request('/api/points/total'),
+
+  // Habits — the monthly set is Gemini-generated server-side; these read it
+  // and persist per-day completion + points. `date`/`month` are the DEVICE's
+  // local values so "today"/"this month" roll over on the phone's clock.
+
+  // Returns { set } — { id, month, reasoning, source, habits: [...] } or null
+  // if this month hasn't been generated yet.
+  getCurrentHabitSet: (month) =>
+    request(`/api/habits/current-set?month=${encodeURIComponent(month)}`),
+
+  // Creates this month's set (Gemini, falling back to the default list
+  // server-side). Idempotent — returns the existing set if one exists.
+  generateHabitSet: (month) =>
+    request('/api/habits/generate', {
+      method: 'POST',
+      body: JSON.stringify({ month }),
+    }),
+
+  getTodayHabits: (date) =>
+    request(`/api/habits/today?date=${encodeURIComponent(date)}`),
+
+  // payload: { habit_item_id, date, completed } — toggles the habit; points
+  // amount is looked up server-side from the generated habit item.
+  toggleHabit: (payload) =>
+    request('/api/habits/complete', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
 };

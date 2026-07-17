@@ -104,10 +104,6 @@ function OnboardingFlow({ navigation }) {
       // BRFSS-coded 7 model features → ML prediction (stored server-side)
       await api.saveHealthInputs(buildHealthInputsPayload(answers));
       const modelPayload = buildModelPayload(answers);
-      // TEMPORARY DEBUG: print the raw answers + BRFSS-coded payload to the
-      // Metro console to verify a specific profile's score — remove when done
-      console.log('[DEBUG] raw onboarding answers:', JSON.stringify(answers, null, 2));
-      console.log('[DEBUG] POST /api/predictions payload:', JSON.stringify(modelPayload, null, 2));
       await api.createPrediction(modelPayload);
       navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
     } catch (e) {
