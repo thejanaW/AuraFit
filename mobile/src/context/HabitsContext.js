@@ -8,18 +8,7 @@ import React, {
 } from 'react';
 
 import { api } from '../services/api';
-
-// Local calendar date/month (NOT UTC) — the phone decides when "today" and
-// "this month" roll over.
-function localToday() {
-  const d = new Date();
-  const pad = (n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
-
-function localMonth() {
-  return localToday().slice(0, 7);
-}
+import { localToday, localMonth } from '../utils/date';
 
 // 'YYYY-MM' → 'July'
 function monthName(month) {

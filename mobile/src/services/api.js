@@ -50,6 +50,10 @@ export const api = {
   // Returns { total } — lifetime points sum for the authed user.
   getPointsTotal: () => request('/api/points/total'),
 
+  // Returns { streak, todayComplete } — consecutive days with ≥1 completed
+  // habit, ending at the device's local today.
+  getStreak: (date) => request(`/api/streak?date=${encodeURIComponent(date)}`),
+
   // Habits — the monthly set is Gemini-generated server-side; these read it
   // and persist per-day completion + points. `date`/`month` are the DEVICE's
   // local values so "today"/"this month" roll over on the phone's clock.

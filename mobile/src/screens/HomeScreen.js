@@ -16,6 +16,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { useHabits } from '../context/HabitsContext';
 import { api } from '../services/api';
+import { localToday } from '../utils/date';
 import { colors, fonts, cardStyle } from '../theme';
 
 // Per-condition risk breakdown (predictions.risk_breakdown jsonb). Labels are
@@ -64,17 +65,20 @@ export default function HomeScreen() {
   const [prediction, setPrediction] = useState(null);
   const [previous, setPrevious] = useState(null);
   const [pointsTotal, setPointsTotal] = useState(0);
+  const [streak, setStreak] = useState(0);
 
   const loadDashboard = useCallback(async () => {
     setError(null);
     try {
-      const [predRes, pointsRes] = await Promise.all([
+      const [predRes, pointsRes, streakRes] = await Promise.all([
         api.getLatestPrediction(),
         api.getPointsTotal(),
+        api.getStreak(localToday()),
       ]);
       setPrediction(predRes.prediction);
       setPrevious(predRes.previous);
       setPointsTotal(pointsRes.total);
+      setStreak(streakRes.streak);
     } catch (err) {
       setError(err.message);
     }
@@ -194,10 +198,11 @@ export default function HomeScreen() {
           </View>
           <View style={styles.statCard}>
             <Text style={styles.statLabel}>STREAK</Text>
-            {/* TODO: streak logic doesn't exist yet — build once habit
-                completion tracking lands, then count consecutive active days */}
+            {/* Consecutive days with ≥1 completed habit (GET /api/streak);
+                refreshes on focus along with the rest of the dashboard */}
             <Text style={styles.statValue}>
-              0<Text style={styles.statUnit}> days</Text>
+              {streak}
+              <Text style={styles.statUnit}>{streak === 1 ? ' day' : ' days'}</Text>
             </Text>
           </View>
         </View>
