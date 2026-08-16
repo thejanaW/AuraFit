@@ -24,10 +24,10 @@ async function request(path, options = {}) {
 }
 
 export const api = {
-  register: (email, password) =>
+  register: (email, password, name) =>
     request('/auth/register', {
       method: 'POST',
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email, password, name }),
     }),
 
   login: (email, password) =>
@@ -37,6 +37,9 @@ export const api = {
     }),
 
   refresh: () => request('/auth/refresh', { method: 'POST' }),
+
+  // Returns { user: { id, email, name, created_at } } for the authed user.
+  getMe: () => request('/auth/me'),
 
   saveHealthInputs: (payload) =>
     request('/api/health-inputs', {

@@ -53,8 +53,8 @@ export function AuthProvider({ children }) {
     })();
   }, [resolveSession]);
 
-  async function register(email, password) {
-    const { token, user: u } = await api.register(email, password);
+  async function register(email, password, name) {
+    const { token, user: u } = await api.register(email, password, name);
     await SecureStore.setItemAsync('aurafit_token', token);
     await SecureStore.setItemAsync('aurafit_user', JSON.stringify(u));
     // Brand-new account — skip the network round trip, it can't have a

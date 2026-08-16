@@ -2,6 +2,7 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const supabase = require('../config/supabase');
+const { requireAuth } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -13,10 +14,14 @@ function signToken(userId) {
 
 // POST /auth/register
 router.post('/register', async (req, res) => {
-  const { email, password } = req.body;
+  const { email, password, name } = req.body;
   if (!email || !password) {
     return res.status(400).json({ error: 'email and password are required' });
   }
+  // name is optional server-side (existing/older clients still work without
+  // it) — the mobile Register screen requires it, but that's a client-side
+  // rule, not a data-integrity one, so it stays nullable here too.
+  const trimmedName = typeof name === 'string' && name.trim() ? name.trim() : null;
 
   const hash = await bcrypt.hash(password, 12);
 
@@ -24,8 +29,8 @@ router.post('/register', async (req, res) => {
   // we manage credentials ourselves so the backend stays the single source of truth.
   const { data, error } = await supabase
     .from('users')
-    .insert({ email, password_hash: hash })
-    .select('id, email, created_at')
+    .insert({ email, password_hash: hash, name: trimmedName })
+    .select('id, email, name, created_at')
     .single();
 
   if (error) {
@@ -48,7 +53,7 @@ router.post('/login', async (req, res) => {
 
   const { data: user, error } = await supabase
     .from('users')
-    .select('id, email, password_hash, created_at')
+    .select('id, email, name, password_hash, created_at')
     .eq('email', email)
     .single();
 
@@ -64,8 +69,24 @@ router.post('/login', async (req, res) => {
   const token = signToken(user.id);
   res.json({
     token,
-    user: { id: user.id, email: user.email, created_at: user.created_at },
+    user: { id: user.id, email: user.email, name: user.name, created_at: user.created_at },
   });
+});
+
+// GET /auth/me — current user's own profile, incl. name (used by ProfileScreen;
+// login/register also return the user object directly so this mainly serves a
+// re-fetch after the token was restored from storage without a fresh login).
+router.get('/me', requireAuth, async (req, res) => {
+  const { data: user, error } = await supabase
+    .from('users')
+    .select('id, email, name, created_at')
+    .eq('id', req.userId)
+    .single();
+
+  if (error || !user) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+  res.json({ user });
 });
 
 // POST /auth/refresh

@@ -43,16 +43,18 @@ function timeGreeting() {
   return 'Good evening';
 }
 
-// TODO: users table has no display-name column yet — derive one from the email
-// prefix until a profile/name field exists (e.g. collected during onboarding).
-function displayName(email) {
-  if (!email) return 'there';
-  const prefix = email.split('@')[0];
+// Prefer the real stored name; fall back to deriving one from the email
+// prefix only for pre-existing users created before the `name` column
+// existed (migration 006) or who registered via an older client build.
+function displayName(user) {
+  if (user?.name) return user.name;
+  if (!user?.email) return 'there';
+  const prefix = user.email.split('@')[0];
   return prefix.charAt(0).toUpperCase() + prefix.slice(1);
 }
 
 export default function HomeScreen({ navigation }) {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const insets = useSafeAreaInsets();
   // Shared habits state (see HabitsContext) — a toggle on the Habits tab is
   // reflected here immediately, both screens read the same object. reasoning
@@ -135,13 +137,15 @@ export default function HomeScreen({ navigation }) {
         <View style={styles.headerRow}>
           <View style={styles.flex}>
             <Text style={styles.greetingSmall}>{timeGreeting()},</Text>
-            <Text style={styles.greetingName}>{displayName(user?.email)}</Text>
+            <Text style={styles.greetingName}>{displayName(user)}</Text>
           </View>
           <TouchableOpacity style={styles.iconButton}>
             <Ionicons name="notifications-outline" size={20} color={colors.textSecondary} />
           </TouchableOpacity>
-          {/* TEMPORARY: profile icon logs out until the Profile screen exists */}
-          <TouchableOpacity style={styles.iconButton} onPress={logout}>
+          <TouchableOpacity
+            style={styles.iconButton}
+            onPress={() => navigation.navigate('Profile')}
+          >
             <Ionicons name="person-outline" size={20} color={colors.textSecondary} />
           </TouchableOpacity>
         </View>

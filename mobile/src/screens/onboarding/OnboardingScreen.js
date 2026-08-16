@@ -12,6 +12,7 @@ import Step7Health, { isStep7Complete } from './steps/Step7Health';
 import { buildModelPayload, buildHealthInputsPayload } from '../../utils/onboardingPayloads';
 import { api } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
+import { localMonth } from '../../utils/date';
 import { colors, fonts } from '../../theme';
 
 // Step registry — one entry per onboarding step, in order. To add a step:
@@ -107,6 +108,26 @@ function OnboardingFlow({ navigation }) {
       await api.saveHealthInputs(buildHealthInputsPayload(answers));
       const modelPayload = buildModelPayload(answers);
       await api.createPrediction(modelPayload);
+
+      // Generate this month's habit set + score reasoning right away, using
+      // the exact same endpoint/logic the Habits tab's manual button calls —
+      // otherwise Home would show an alarming risk breakdown with no
+      // explanation until the user happened to visit Habits and tap Generate.
+      // Same loading state stays on through this call (still inside
+      // `submitting`), so there's one continuous spinner, not a false "done"
+      // moment. This counts as the month's generation server-side (idempotent
+      // per month), so the Habits tab won't prompt again until next month.
+      // Gemini failures are already handled inside /api/habits/generate
+      // (falls back to the default habit list + generic reasoning) so this
+      // doesn't throw for that reason; a genuine network/backend hiccup here
+      // is swallowed rather than blocking the user out of the app — Home and
+      // Habits just fall back to showing the manual generate prompt.
+      try {
+        await api.generateHabitSet(localMonth());
+      } catch (genErr) {
+        console.warn('Automatic habit generation failed after onboarding:', genErr.message);
+      }
+
       navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
     } catch (e) {
       setError(e.message || 'Something went wrong. Please try again.');

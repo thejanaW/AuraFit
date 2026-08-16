@@ -13,6 +13,7 @@ import { useAuth } from '../context/AuthContext';
 
 export default function RegisterScreen({ navigation }) {
   const { register } = useAuth();
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -20,7 +21,7 @@ export default function RegisterScreen({ navigation }) {
   const [loading, setLoading] = useState(false);
 
   async function handleRegister() {
-    if (!email || !password || !confirm) {
+    if (!name.trim() || !email || !password || !confirm) {
       setError('All fields are required.');
       return;
     }
@@ -35,7 +36,7 @@ export default function RegisterScreen({ navigation }) {
     setError('');
     setLoading(true);
     try {
-      await register(email.trim().toLowerCase(), password);
+      await register(email.trim().toLowerCase(), password, name.trim());
     } catch (e) {
       setError(e.message || 'Registration failed. Please try again.');
     } finally {
@@ -53,6 +54,14 @@ export default function RegisterScreen({ navigation }) {
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
+      <TextInput
+        style={styles.input}
+        placeholder="Name"
+        placeholderTextColor="#666"
+        autoCapitalize="words"
+        value={name}
+        onChangeText={setName}
+      />
       <TextInput
         style={styles.input}
         placeholder="Email"
