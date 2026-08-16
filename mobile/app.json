@@ -13,17 +13,30 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.aurafit.app"
+      "bundleIdentifier": "com.aurafit.app",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "AuraFit uses your location to check whether you're close enough to a reward pin to claim it."
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0A0A0A"
       },
-      "package": "com.aurafit.app"
+      "package": "com.aurafit.app",
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ]
     },
     "plugins": [
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "AuraFit uses your location to check whether you're close enough to a reward pin to claim it."
+        }
+      ]
     ]
   }
 }

@@ -12,7 +12,14 @@ async function request(path, options = {}) {
 
   const res = await fetch(`${BASE_URL}${path}`, { ...options, headers });
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Request failed');
+  if (!res.ok) {
+    // Attach the full body so callers needing extra fields (e.g. the reward
+    // claim endpoint's distanceMeters on a 403) don't have to re-fetch them.
+    const err = new Error(data.error || 'Request failed');
+    err.data = data;
+    err.status = res.status;
+    throw err;
+  }
   return data;
 }
 
@@ -80,5 +87,18 @@ export const api = {
     request('/api/habits/complete', {
       method: 'POST',
       body: JSON.stringify(payload),
+    }),
+
+  // Returns { pins: [{id, brand_name, description, reward_value, lat, lng,
+  // distance_m, claimed}], claimRadiusMeters } — every reward pin with live
+  // distance from the given position.
+  getRewardPins: (lat, lng) =>
+    request(`/api/rewards/pins?lat=${lat}&lng=${lng}`),
+
+  // Throws with err.data.distanceMeters/claimRadiusMeters when out of range.
+  claimReward: (rewardPinId, lat, lng) =>
+    request('/api/rewards/claim', {
+      method: 'POST',
+      body: JSON.stringify({ reward_pin_id: rewardPinId, lat, lng }),
     }),
 };

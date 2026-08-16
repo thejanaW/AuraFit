@@ -49,7 +49,10 @@
       "Bash(break)",
       "Bash(/Users/thejanaw/Documents/thejana/UNI/AuraFit/ml-service/venv/bin/python *)",
       "Bash(xargs kill)",
-      "Bash(git -C /Users/thejanaw/Documents/thejana/UNI/AuraFit diff mobile/src/screens/onboarding/OnboardingScreen.js)"
+      "Bash(git -C /Users/thejanaw/Documents/thejana/UNI/AuraFit diff mobile/src/screens/onboarding/OnboardingScreen.js)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push *)"
     ]
   }
 }

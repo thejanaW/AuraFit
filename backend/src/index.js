@@ -8,6 +8,7 @@ const healthInputsRouter = require('./routes/healthInputs');
 const pointsRouter = require('./routes/points');
 const habitsRouter = require('./routes/habits');
 const streakRouter = require('./routes/streak');
+const rewardsRouter = require('./routes/rewards');
 
 const app = express();
 
@@ -20,6 +21,7 @@ app.use('/api/health-inputs', healthInputsRouter);
 app.use('/api/points', pointsRouter);
 app.use('/api/habits', habitsRouter);
 app.use('/api/streak', streakRouter);
+app.use('/api/rewards', rewardsRouter);
 
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 

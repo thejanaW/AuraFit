@@ -34,7 +34,7 @@ The app takes user lifestyle inputs, runs them through a trained ML model to pre
    - A second generate call within the same month correctly returns the existing set (`alreadyExisted: true`) rather than creating duplicates
 10. Both Home and the Habits tab read from a shared `HabitsContext` so completion state stays in sync between screens instantly while both are mounted
 11. Completing a habit awards its exact points value; un-completing removes the matching points row; duplicate completes don't double-award; unknown habit IDs 404. All verified end-to-end (17/17 checks) against the live backend, Supabase, and real Gemini API.
-12. **Streak — about to be built** (next planned item): counts consecutive days with at least one habit completed (forgiving definition — not all 5 required), breaking only once a full day has passed with zero completions; today's in-progress state doesn't break the streak prematurely.
+12. **Streak — built and verified (2026-07-18):** `GET /api/streak` counts consecutive days with at least one habit completed (forgiving definition — not all 5 required), breaking only once a full day has passed with zero completions; today's in-progress state doesn't break the streak prematurely. 90-day lookback bound, UTC date-string arithmetic server-side. Home STREAK card wired to it. E2E verified 9/9 against live backend+Supabase.
 13. **Planned enhancement, deliberately deferred (not yet built):** step-count auto-tracking via the phone's built-in pedometer (`expo-sensors` Pedometer API — no ejecting from Expo managed workflow required). Would only auto-verify step-based habits specifically; all other habit types (water, sleep, diet, smoking, etc.) have no phone-sensor equivalent and still need manual completion. Requires physical device testing (iOS Simulator has no real accelerometer). Deferred to Chunk 3 wrap-up or Chunk 5 polish, not built now.
 14. After onboarding, avatar progression is meant to be driven by habit streaks and app consistency — NOT by continuous re-scoring. **Avatar progression tracking (points/level system) is deliberately deferred alongside the avatar itself** — will be built together, not separately, since tier boundaries need calibrating against the avatar once it exists.
 15. GPS reward map (Chunk 4) is a separate, complementary earning mechanism — not yet started.
@@ -43,7 +43,7 @@ The app takes user lifestyle inputs, runs them through a trained ML model to pre
 - `predicted_health_score` — ML-derived, mostly static, updated only on rare re-assessment
 - `avatar_progression_level` — gamified, dynamic, grows with habit streaks/GPS activity (not yet implemented)
 
-**Critical development path:** Auth → ML risk prediction (per-condition, age-projected, peer-relative) → Onboarding → Home dashboard (score, risk breakdown, reasoning) → Habits (Gemini-generated, monthly progressive) → Streak (next) → Avatar + avatar progression (deferred) → GPS rewards (Chunk 4).
+**Critical development path:** Auth → ML risk prediction (per-condition, age-projected, peer-relative) → Onboarding → Home dashboard (score, risk breakdown, reasoning) → Habits (Gemini-generated, monthly progressive) → Streak (done) → GPS rewards (Chunk 4, in progress) → Avatar + avatar progression (deferred).
 
 ---
 
@@ -119,7 +119,7 @@ AuraFit/
 ### Chunk 2 — ML Microservice ✅ COMPLETE
 Dataset (BRFSS 2023, 297,703 model-ready rows), 4 trained Logistic Regression models (ROC-AUC 0.78-0.83), FastAPI service, backend integration, full 7-step onboarding form.
 
-### Chunk 3 — Avatar & Habit System — IN PROGRESS (core nearly complete)
+### Chunk 3 — Avatar & Habit System — CORE COMPLETE (avatar itself deliberately deferred)
 
 **Completed:**
 - Home dashboard (score + "~10 years" projection subtext, points, trend card, risk breakdown with 4 correctly-labeled condition cards, score reasoning card, habits section)
@@ -129,9 +129,8 @@ Dataset (BRFSS 2023, 297,703 model-ready rows), 4 trained Logistic Regression mo
 - Risk bands rebuilt as age-sensitive (4 life-stage buckets) after data-sufficiency analysis — see Key Findings
 - General health slider UX improved with descriptive per-value anchors
 - **Gemini habit generation, fully built and verified end-to-end (17/17 checks):** monthly progressive difficulty based on real per-habit completion history, combined score reasoning generation, fallback system for Gemini failures (verified against a real capacity outage during testing), `habit_sets` table (migration 004) with `habit_item_id` properly referenced by the `habits` completion table
-- All Chunk 3 work through this point committed to Git
-
-**Next planned item:** Streak tracking — counts consecutive days with ≥1 habit completed; in-progress "today" doesn't break the streak; breaks only after a full day passes with zero completions. Not yet built.
+- Streak tracking — `GET /api/streak`, consecutive-days-with-≥1-completion logic, Home dashboard wiring, e2e verified 9/9
+- All Chunk 3 buildable work through this point committed to Git
 
 **Deliberately deferred (not blocking, no urgent timeline):**
 - Avatar — likely short looping video per tier, matching dashboard background color; needs tier boundaries calibrated against the peer-relative score range once built
@@ -145,7 +144,22 @@ Dataset (BRFSS 2023, 297,703 model-ready rows), 4 trained Logistic Regression mo
 - Fallback-sourced monthly habit sets have no in-app "regenerate" option; requires manual Supabase intervention
 
 ### Chunk 4 — GPS Reward Map
-Not started. Map screen (React Native Maps), seed reward pins, proximity check (20-30m radius via PostGIS), claim reward API endpoint, points awarded on claim → feeds avatar progression, brand reward display UI.
+**IN PROGRESS.** Migration `005_reward_claims.sql` (backend/migrations/) — `reward_claims` table (unique per user+pin, RLS) + two PostGIS RPC functions (`reward_pin_distance_meters` for the claim proximity check, `list_reward_pins_with_distance` for the map's pin list) — written, not yet pasted into Supabase by the user. Backend `GET /api/rewards/pins` + `POST /api/rewards/claim` (backend/src/routes/rewards.js, 30m claim radius, idempotent, rollback-on-points-failure, wired into index.js) built, boots clean, not yet e2e-verified against live Supabase (blocked on the migration being applied). Mobile: `react-native-maps` + `expo-location` installed, location permission strings added to app.json, `MapScreen.js` rebuilt from stub to a real dark-themed map (markers colored by claimed state, tap-to-select claim card, permission-denied fallback, refresh button), `api.getRewardPins`/`api.claimReward` added — not yet tested on-device.
+
+**Seed data (curated 2026-08-04, do not replace with generic landmarks again):** 8 real health/fitness-themed businesses in the Colombo/Moratuwa area, Sri Lanka. Coordinates pulled from mapping data (not personally surveyed by the user, but real named businesses at real locations — meaningfully more accurate than the original generic-landmark placeholder set that preceded this one). Reward descriptions are PLACEHOLDER terms only — no real partnership/discount agreements exist with these businesses.
+
+| Brand | Type | Lat | Lng | Points | Reward (placeholder) |
+|---|---|---|---|---|---|
+| Oxygen Fitness Center | Gym | 6.786804 | 79.884835 | 30 | 10% off a day pass |
+| The Core Fitness | Gym | 6.767523 | 79.883523 | 30 | 10% off a day pass |
+| Iron Bull Fitness Arena | Gym | 6.784661 | 79.885478 | 30 | 10% off a day pass |
+| Healers Juice Bar | Juice bar | 6.794910 | 79.887954 | 20 | Free small juice |
+| RAW Organic Handcrafted Juices | Juice bar | 6.858496 | 79.891788 | 20 | Free small juice |
+| Thinethsa Pharmacy Moratuwa | Pharmacy | 6.771052 | 79.883304 | 15 | 5% off health products |
+| Happy Health Pharmacy | Pharmacy | 6.794990 | 79.903043 | 15 | 5% off health products |
+| Pro Player's Sports | Sports store | 6.797569 | 79.888734 | 25 | 10% off sportswear |
+
+Remaining Chunk 4 scope: user pastes migration 005 into Supabase, then live e2e verification (claim-in-range, claim-out-of-range with distance feedback, duplicate-claim idempotency, unknown pin 404, unauthenticated 401), then on-device testing of the map screen.
 
 ### Chunk 5 — Polish, Testing & Dissertation
 UAT test cases, bug fixes, UI polish to match Figma designs pixel-perfectly, onboarding-every-login fix, dissertation Chapters 3 and 4 write-up, five diagrams (System Architecture, Use Case, ER/Database Schema, Sequence for ML prediction loop, Avatar State), final submission prep. Candidate home for step-count auto-tracking and Profile screen if not done earlier.
@@ -264,6 +278,6 @@ Claude Code (VS Code), Supabase (DB/auth/PostGIS), Expo/npx expo, eas-cli, Homeb
 
 **Chunk 1:** Complete.
 **Chunk 2:** Complete.
-**Chunk 3:** Core build complete — Home dashboard, risk breakdown, Habits tab, and Gemini-powered monthly-progressive habit generation with score reasoning and a verified fallback system are all built, tested (17/17 e2e checks), and committed to Git. Streak tracking is the next planned item. Avatar and avatar progression tracking remain deliberately deferred until built together. Step-count auto-tracking noted as a future enhancement.
+**Chunk 3:** Buildable scope complete — Home dashboard, risk breakdown, Habits tab, Gemini-powered monthly-progressive habit generation with score reasoning and a verified fallback system, and streak tracking are all built, tested, and committed to Git. Avatar and avatar progression tracking remain deliberately deferred until built together. Step-count auto-tracking noted as a future enhancement.
 
-**Next action:** Build streak tracking (GET /api/streak, consecutive-days-with-≥1-completion logic, Home dashboard wiring). After that, Chunk 3's buildable scope is complete except for the avatar itself.
+**Next action:** Chunk 4 — GPS Reward Map (in progress, see the Chunk 4 section above for full detail). Backend routes and mobile map screen are built; migration `005_reward_claims.sql` (reward_claims table + PostGIS RPCs + curated 8-business seed) is written but not yet pasted into Supabase by the user — once applied, live e2e verification and on-device map testing are the remaining steps.

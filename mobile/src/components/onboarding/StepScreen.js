@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -29,9 +30,12 @@ export default function StepScreen({
   continueLabel = 'Continue',
   loading = false,
   error = '',
+  onLogout,
+  onSkipToDashboard,
   children,
 }) {
   const progress = stepNumber / totalSteps;
+  const [menuVisible, setMenuVisible] = useState(false);
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
@@ -49,7 +53,59 @@ export default function StepScreen({
           <Text style={styles.stepCounter}>
             {stepNumber}/{totalSteps}
           </Text>
+          <TouchableOpacity
+            style={styles.skipButton}
+            onPress={() => setMenuVisible(true)}
+            hitSlop={12}
+          >
+            <Text style={styles.skipText}>Skip</Text>
+          </TouchableOpacity>
         </View>
+
+        <Modal
+          visible={menuVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setMenuVisible(false)}
+        >
+          <TouchableOpacity
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => setMenuVisible(false)}
+          >
+            <View style={styles.sheet} onStartShouldSetResponder={() => true}>
+              <Text style={styles.sheetTitle}>Leave onboarding?</Text>
+              <Text style={styles.sheetSubtitle}>
+                Your answers so far won't be saved unless you finish.
+              </Text>
+              <TouchableOpacity
+                style={styles.sheetOption}
+                onPress={() => {
+                  setMenuVisible(false);
+                  onSkipToDashboard?.();
+                }}
+              >
+                <Ionicons name="arrow-forward-circle-outline" size={20} color={colors.text} />
+                <Text style={styles.sheetOptionText}>Skip to Dashboard</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.sheetOption}
+                onPress={() => {
+                  setMenuVisible(false);
+                  onLogout?.();
+                }}
+              >
+                <Ionicons name="log-out-outline" size={20} color={colors.negative} />
+                <Text style={[styles.sheetOptionText, { color: colors.negative }]}>
+                  Log out
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.sheetCancel} onPress={() => setMenuVisible(false)}>
+                <Text style={styles.sheetCancelText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </Modal>
 
         <ScrollView
           style={styles.flex}
@@ -127,6 +183,64 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     minWidth: 32,
     textAlign: 'right',
+  },
+  skipButton: {
+    marginLeft: 14,
+  },
+  skipText: {
+    fontFamily: fonts.medium,
+    fontSize: 13,
+    color: colors.textSecondary,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    justifyContent: 'flex-end',
+  },
+  sheet: {
+    backgroundColor: colors.card,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderBottomWidth: 0,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 32,
+  },
+  sheetTitle: {
+    fontFamily: fonts.semibold,
+    fontSize: 17,
+    color: colors.text,
+    marginBottom: 4,
+  },
+  sheetSubtitle: {
+    fontFamily: fonts.regular,
+    fontSize: 13,
+    color: colors.textMuted,
+    marginBottom: 20,
+  },
+  sheetOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 14,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  sheetOptionText: {
+    fontFamily: fonts.medium,
+    fontSize: 15,
+    color: colors.text,
+  },
+  sheetCancel: {
+    alignItems: 'center',
+    paddingTop: 18,
+  },
+  sheetCancelText: {
+    fontFamily: fonts.medium,
+    fontSize: 14,
+    color: colors.textMuted,
   },
   content: {
     paddingHorizontal: 24,

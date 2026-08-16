@@ -11,6 +11,7 @@ import Step6Habits, { isStep6Complete } from './steps/Step6Habits';
 import Step7Health, { isStep7Complete } from './steps/Step7Health';
 import { buildModelPayload, buildHealthInputsPayload } from '../../utils/onboardingPayloads';
 import { api } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 import { colors, fonts } from '../../theme';
 
 // Step registry — one entry per onboarding step, in order. To add a step:
@@ -89,6 +90,7 @@ function PlaceholderStep({ label }) {
 
 function OnboardingFlow({ navigation }) {
   const { answers, stepIndex, goNext, goBack } = useOnboarding();
+  const { logout } = useAuth();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -130,6 +132,19 @@ function OnboardingFlow({ navigation }) {
     }
   }
 
+  // logout() clears the token and flips AuthContext's `user` to null —
+  // AppNavigator swaps to AuthStack on its own, no explicit navigate needed
+  // (same pattern as the Home profile icon).
+  function handleLogout() {
+    logout();
+  }
+
+  // Leaves onboarding without submitting — answers held in OnboardingContext
+  // are simply discarded when this screen unmounts. No prediction is created.
+  function handleSkipToDashboard() {
+    navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
+  }
+
   return (
     <StepScreen
       stepNumber={stepIndex + 1}
@@ -144,6 +159,8 @@ function OnboardingFlow({ navigation }) {
       continueLabel={isLastStep ? 'Finish' : 'Continue'}
       loading={submitting}
       error={error}
+      onLogout={handleLogout}
+      onSkipToDashboard={handleSkipToDashboard}
     >
       {StepBody ? <StepBody /> : <PlaceholderStep label={step.label} />}
     </StepScreen>

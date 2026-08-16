@@ -51,7 +51,7 @@ function displayName(email) {
   return prefix.charAt(0).toUpperCase() + prefix.slice(1);
 }
 
-export default function HomeScreen() {
+export default function HomeScreen({ navigation }) {
   const { user, logout } = useAuth();
   const insets = useSafeAreaInsets();
   // Shared habits state (see HabitsContext) — a toggle on the Habits tab is
@@ -157,11 +157,18 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* Aura score */}
-        <View style={styles.scoreArea}>
-          <Text style={styles.scoreLabel}>AURA SCORE</Text>
-          {score !== null ? (
-            <>
+        {error && (
+          <TouchableOpacity style={styles.errorCard} onPress={onRefresh}>
+            <Text style={styles.errorText}>{error}</Text>
+            <Text style={styles.errorRetry}>Tap to retry</Text>
+          </TouchableOpacity>
+        )}
+
+        {prediction ? (
+          <>
+            {/* Aura score */}
+            <View style={styles.scoreArea}>
+              <Text style={styles.scoreLabel}>AURA SCORE</Text>
               <View style={styles.scoreRow}>
                 <Text style={styles.scoreValue}>{score}</Text>
                 <Text style={styles.scoreMax}>/100</Text>
@@ -172,155 +179,164 @@ export default function HomeScreen() {
               <Text style={styles.scoreProjectionNote}>
                 Reflects your risk in ~10 years if these habits continue
               </Text>
-            </>
-          ) : (
-            <>
-              <Text style={styles.scoreValue}>—</Text>
-              <Text style={styles.scoreEmpty}>
-                Complete onboarding to see your score
-              </Text>
-            </>
-          )}
-        </View>
-
-        {error && (
-          <TouchableOpacity style={styles.errorCard} onPress={onRefresh}>
-            <Text style={styles.errorText}>{error}</Text>
-            <Text style={styles.errorRetry}>Tap to retry</Text>
-          </TouchableOpacity>
-        )}
-
-        {/* Points + streak stat cards */}
-        <View style={styles.statRow}>
-          <View style={[styles.statCard, styles.statCardLeft]}>
-            <Text style={styles.statLabel}>POINTS</Text>
-            <Text style={styles.statValue}>{pointsTotal}</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statLabel}>STREAK</Text>
-            {/* Consecutive days with ≥1 completed habit (GET /api/streak);
-                refreshes on focus along with the rest of the dashboard */}
-            <Text style={styles.statValue}>
-              {streak}
-              <Text style={styles.statUnit}>{streak === 1 ? ' day' : ' days'}</Text>
-            </Text>
-          </View>
-        </View>
-
-        {/* Week trend — only rendered when a previous prediction exists */}
-        {trend !== null && (
-          <View style={styles.trendCard}>
-            <View style={styles.flex}>
-              <Text style={styles.trendLabel}>This week's trend</Text>
-              <Text style={styles.trendSub}>vs your previous assessment</Text>
             </View>
-            <View style={styles.trendValueRow}>
-              <Ionicons
-                name={trend >= 0 ? 'trending-up' : 'trending-down'}
-                size={20}
-                color={trend >= 0 ? colors.positive : colors.negative}
-              />
-              <Text
-                style={[
-                  styles.trendValue,
-                  { color: trend >= 0 ? colors.positive : colors.negative },
-                ]}
-              >
-                {trend >= 0 ? '+' : ''}
-                {trend.toFixed(1)}%
-              </Text>
-            </View>
-          </View>
-        )}
 
-        {/* ~10 year per-condition risk breakdown, from the same
-            /api/predictions/latest payload as the score and trend.
-            "~10 YEAR" matches the score subtext and the actual
-            RISK_PROJECTION_YEARS = 10 driving the projection — one
-            consistent horizon phrase, not the older "5-10 year" copy */}
-        <Text style={styles.riskHeader}>~10 YEAR RISK BREAKDOWN</Text>
-        {prediction?.risk_breakdown ? (
-          RISK_CONDITIONS.map(({ key, label }) => {
-            const band = prediction.risk_breakdown[key];
-            const segments = RISK_BAND_SEGMENTS[band] || 0;
-            const bandColor = RISK_BAND_COLORS[band] || colors.textMuted;
-            return (
-              <View key={key} style={styles.riskCard}>
-                <View style={styles.riskCardTop}>
-                  <Text style={styles.riskCondition}>{label}</Text>
-                  <Text style={[styles.riskBand, { color: bandColor }]}>
-                    {band || '—'}
+            {/* Points + streak stat cards */}
+            <View style={styles.statRow}>
+              <View style={[styles.statCard, styles.statCardLeft]}>
+                <Text style={styles.statLabel}>POINTS</Text>
+                <Text style={styles.statValue}>{pointsTotal}</Text>
+              </View>
+              <View style={styles.statCard}>
+                <Text style={styles.statLabel}>STREAK</Text>
+                {/* Consecutive days with ≥1 completed habit (GET /api/streak);
+                    refreshes on focus along with the rest of the dashboard */}
+                <Text style={styles.statValue}>
+                  {streak}
+                  <Text style={styles.statUnit}>{streak === 1 ? ' day' : ' days'}</Text>
+                </Text>
+              </View>
+            </View>
+
+            {/* Week trend — only rendered when a previous prediction exists */}
+            {trend !== null && (
+              <View style={styles.trendCard}>
+                <View style={styles.flex}>
+                  <Text style={styles.trendLabel}>This week's trend</Text>
+                  <Text style={styles.trendSub}>vs your previous assessment</Text>
+                </View>
+                <View style={styles.trendValueRow}>
+                  <Ionicons
+                    name={trend >= 0 ? 'trending-up' : 'trending-down'}
+                    size={20}
+                    color={trend >= 0 ? colors.positive : colors.negative}
+                  />
+                  <Text
+                    style={[
+                      styles.trendValue,
+                      { color: trend >= 0 ? colors.positive : colors.negative },
+                    ]}
+                  >
+                    {trend >= 0 ? '+' : ''}
+                    {trend.toFixed(1)}%
                   </Text>
                 </View>
-                <View style={styles.riskBarRow}>
-                  {[1, 2, 3].map((segment) => (
-                    <View
-                      key={segment}
-                      style={[
-                        styles.riskBarSegment,
-                        segment <= segments && { backgroundColor: bandColor },
-                      ]}
-                    />
-                  ))}
-                </View>
               </View>
-            );
-          })
-        ) : (
-          <View style={styles.riskEmptyCard}>
-            <Text style={styles.riskEmptyText}>
-              Your risk breakdown appears here once your first assessment is
-              complete
-            </Text>
-          </View>
-        )}
+            )}
 
-        {/* Gemini's plain-language "why" for the score/bands — stored with the
-            month's habit set. Deliberately visually secondary to the score. */}
-        {reasoning && (
-          <View style={styles.reasoningCard}>
-            <Text style={styles.reasoningLabel}>WHY YOUR SCORE LOOKS THIS WAY</Text>
-            <Text style={styles.reasoningText}>{reasoning}</Text>
-          </View>
-        )}
-
-        {/* Today's habits — read-only summary of the shared checklist state;
-            toggling (and generating) lives on the Habits tab */}
-        <View style={styles.habitsHeader}>
-          <Text style={styles.sectionTitle}>Today's habits</Text>
-          {hasCurrentSet && (
-            <Text style={styles.habitsCount}>
-              {completedCount}/{habits.length} complete
-            </Text>
-          )}
-        </View>
-        {hasCurrentSet ? (
-          habits.map((habit) => (
-            <View key={habit.id} style={styles.habitRow}>
-              <View
-                style={[styles.habitCheck, habit.completed && styles.habitCheckDone]}
-              >
-                {habit.completed && (
-                  <Ionicons name="checkmark" size={14} color="#fff" />
-                )}
-              </View>
-              <View style={styles.flex}>
-                <Text
-                  style={[styles.habitTitle, habit.completed && styles.habitTitleDone]}
-                >
-                  {habit.title}
+            {/* ~10 year per-condition risk breakdown, from the same
+                /api/predictions/latest payload as the score and trend.
+                "~10 YEAR" matches the score subtext and the actual
+                RISK_PROJECTION_YEARS = 10 driving the projection — one
+                consistent horizon phrase, not the older "5-10 year" copy */}
+            <Text style={styles.riskHeader}>~10 YEAR RISK BREAKDOWN</Text>
+            {prediction?.risk_breakdown ? (
+              RISK_CONDITIONS.map(({ key, label }) => {
+                const band = prediction.risk_breakdown[key];
+                const segments = RISK_BAND_SEGMENTS[band] || 0;
+                const bandColor = RISK_BAND_COLORS[band] || colors.textMuted;
+                return (
+                  <View key={key} style={styles.riskCard}>
+                    <View style={styles.riskCardTop}>
+                      <Text style={styles.riskCondition}>{label}</Text>
+                      <Text style={[styles.riskBand, { color: bandColor }]}>
+                        {band || '—'}
+                      </Text>
+                    </View>
+                    <View style={styles.riskBarRow}>
+                      {[1, 2, 3].map((segment) => (
+                        <View
+                          key={segment}
+                          style={[
+                            styles.riskBarSegment,
+                            segment <= segments && { backgroundColor: bandColor },
+                          ]}
+                        />
+                      ))}
+                    </View>
+                  </View>
+                );
+              })
+            ) : (
+              <View style={styles.riskEmptyCard}>
+                <Text style={styles.riskEmptyText}>
+                  Your risk breakdown appears here once your first assessment is
+                  complete
                 </Text>
-                <Text style={styles.habitSub}>{habit.subtext}</Text>
               </View>
-              <Text style={styles.habitPoints}>+{habit.points}</Text>
+            )}
+
+            {/* Gemini's plain-language "why" for the score/bands — stored with the
+                month's habit set. Deliberately visually secondary to the score. */}
+            {reasoning && (
+              <View style={styles.reasoningCard}>
+                <Text style={styles.reasoningLabel}>WHY YOUR SCORE LOOKS THIS WAY</Text>
+                <Text style={styles.reasoningText}>{reasoning}</Text>
+              </View>
+            )}
+
+            {/* Today's habits — read-only summary of the shared checklist state;
+                toggling (and generating) lives on the Habits tab */}
+            <View style={styles.habitsHeader}>
+              <Text style={styles.sectionTitle}>Today's habits</Text>
+              {hasCurrentSet && (
+                <Text style={styles.habitsCount}>
+                  {completedCount}/{habits.length} complete
+                </Text>
+              )}
             </View>
-          ))
+            {hasCurrentSet ? (
+              habits.map((habit) => (
+                <View key={habit.id} style={styles.habitRow}>
+                  <View
+                    style={[styles.habitCheck, habit.completed && styles.habitCheckDone]}
+                  >
+                    {habit.completed && (
+                      <Ionicons name="checkmark" size={14} color="#fff" />
+                    )}
+                  </View>
+                  <View style={styles.flex}>
+                    <Text
+                      style={[styles.habitTitle, habit.completed && styles.habitTitleDone]}
+                    >
+                      {habit.title}
+                    </Text>
+                    <Text style={styles.habitSub}>{habit.subtext}</Text>
+                  </View>
+                  <Text style={styles.habitPoints}>+{habit.points}</Text>
+                </View>
+              ))
+            ) : (
+              <View style={styles.habitsEmptyCard}>
+                <Text style={styles.habitsEmptyText}>
+                  No habits for {monthLabel} yet — generate your personalised set on
+                  the Habits tab.
+                </Text>
+              </View>
+            )}
+          </>
         ) : (
-          <View style={styles.habitsEmptyCard}>
-            <Text style={styles.habitsEmptyText}>
-              No habits for {monthLabel} yet — generate your personalised set on
-              the Habits tab.
+          // No prediction on record yet — either a brand-new signup or a
+          // user who tapped "Skip to Dashboard" during onboarding. Re-checked
+          // on every load (not just right after skipping), since loadDashboard
+          // always re-fetches GET /api/predictions/latest above.
+          <View style={styles.startCard}>
+            <View style={styles.startIconWrap}>
+              <Ionicons name="analytics-outline" size={28} color={colors.accent} />
+            </View>
+            <Text style={styles.startHeadline}>
+              Get your personalised health risk score
             </Text>
+            <Text style={styles.startSubtext}>
+              Answer a few quick questions about your lifestyle and we'll project
+              your ~10-year health risk across four key conditions.
+            </Text>
+            <TouchableOpacity
+              style={styles.startButton}
+              onPress={() => navigation.navigate('Onboarding')}
+            >
+              <Text style={styles.startButtonText}>Start My Analysis</Text>
+            </TouchableOpacity>
           </View>
         )}
       </ScrollView>
@@ -431,11 +447,47 @@ const styles = StyleSheet.create({
     marginTop: 4,
     textAlign: 'center',
   },
-  scoreEmpty: {
+  startCard: {
+    ...cardStyle,
+    alignItems: 'center',
+    padding: 28,
+    marginTop: 8,
+  },
+  startIconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'rgba(255, 90, 54, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  startHeadline: {
+    fontFamily: fonts.semibold,
+    fontSize: 19,
+    color: colors.text,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  startSubtext: {
     fontFamily: fonts.regular,
-    fontSize: 12,
+    fontSize: 13,
     color: colors.textMuted,
-    marginTop: 4,
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 22,
+  },
+  startButton: {
+    backgroundColor: colors.accent,
+    borderRadius: 999,
+    paddingVertical: 15,
+    paddingHorizontal: 32,
+    alignItems: 'center',
+  },
+  startButtonText: {
+    fontFamily: fonts.semibold,
+    fontSize: 15,
+    color: colors.text,
   },
   errorCard: {
     ...cardStyle,

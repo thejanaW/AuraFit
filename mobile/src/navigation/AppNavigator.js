@@ -55,12 +55,14 @@ function MainTabs() {
   );
 }
 
-// TODO(chunk 3): gate the initial route on whether the user already has a
-// prediction — GET /api/predictions/latest now exists (api.getLatestPrediction),
-// so this is ready to wire. For now every login still lands on Onboarding.
-function AppStack() {
+// Initial route is gated on whether the authed user already has a prediction
+// on record (AuthContext resolves this via GET /api/predictions/latest right
+// after restoring/creating the session) — Onboarding for a first-timer,
+// MainTabs for a returning user. Screens still navigate freely between the
+// two afterwards (Skip, Start My Analysis, Finish onboarding).
+function AppStack({ initialRouteName }) {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName={initialRouteName}>
       <Stack.Screen name="Onboarding" component={OnboardingScreen} />
       <Stack.Screen name="MainTabs" component={MainTabs} />
     </Stack.Navigator>
@@ -77,7 +79,7 @@ function AuthStack() {
 }
 
 export default function AppNavigator() {
-  const { user, loading } = useAuth();
+  const { user, loading, hasPrediction } = useAuth();
 
   if (loading) {
     return (
@@ -89,7 +91,11 @@ export default function AppNavigator() {
 
   return (
     <NavigationContainer>
-      {user ? <AppStack /> : <AuthStack />}
+      {user ? (
+        <AppStack initialRouteName={hasPrediction ? 'MainTabs' : 'Onboarding'} />
+      ) : (
+        <AuthStack />
+      )}
     </NavigationContainer>
   );
 }
