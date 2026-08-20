@@ -18,6 +18,7 @@ import { useHabits } from '../context/HabitsContext';
 import { api } from '../services/api';
 import { localToday } from '../utils/date';
 import { colors, fonts, cardStyle } from '../theme';
+import AvatarPlayer from '../components/AvatarPlayer';
 
 // Per-condition risk breakdown (predictions.risk_breakdown jsonb). Labels are
 // the four real model conditions — deliberately NOT the older Figma screen's
@@ -150,15 +151,11 @@ export default function HomeScreen({ navigation }) {
           </TouchableOpacity>
         </View>
 
-        {/* Avatar placeholder with glow — real Digital Twin avatar comes later in Chunk 3 */}
+        {/* Digital Twin avatar — tier0.mp4 is the only real clip so far and is
+            used as a TEMPORARY stand-in for all three tiers (see
+            AvatarPlayer.js). Tier is driven by the real predicted_health_score. */}
         <View style={styles.avatarArea}>
-          <View style={styles.avatarGlowOuter}>
-            <View style={styles.avatarGlowInner}>
-              <View style={styles.avatarCircle}>
-                <Ionicons name="body-outline" size={64} color={colors.accent} />
-              </View>
-            </View>
-          </View>
+          <AvatarPlayer score={score} />
         </View>
 
         {error && (
@@ -384,37 +381,6 @@ const styles = StyleSheet.create({
   avatarArea: {
     alignItems: 'center',
     marginTop: 20,
-  },
-  avatarGlowOuter: {
-    width: 176,
-    height: 176,
-    borderRadius: 88,
-    backgroundColor: 'rgba(255, 90, 54, 0.07)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarGlowInner: {
-    width: 152,
-    height: 152,
-    borderRadius: 76,
-    backgroundColor: 'rgba(255, 90, 54, 0.12)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarCircle: {
-    width: 128,
-    height: 128,
-    borderRadius: 64,
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: colors.accent,
-    shadowOpacity: 0.45,
-    shadowRadius: 24,
-    shadowOffset: { width: 0, height: 0 },
-    elevation: 10,
   },
   scoreArea: {
     alignItems: 'center',

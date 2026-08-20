@@ -36,7 +36,8 @@
         {
           "locationWhenInUsePermission": "AuraFit uses your location to check whether you're close enough to a reward pin to claim it."
         }
-      ]
+      ],
+      "expo-video"
     ]
   }
 }
