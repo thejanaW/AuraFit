@@ -19,11 +19,7 @@ export function ageToAgeGroup(age) {
   return Math.floor((age - 25) / 5) + 2;
 }
 
-// Testing showed age dominates the model's predictions — an unhealthy
-// 22-year-old (BMI 31.6, daily smoker, inactive) still scored in the
-// mid-80s, since diagnosis prevalence is low in young BRFSS respondents
-// regardless of habits. Instead of retraining, age is shifted forward by
-// RISK_PROJECTION_YEARS before banding — everything else stays real. This
+
 // reframes the score as "where you'd land in ~10 years if this continues"
 // rather than a current-state snapshot.
 export const RISK_PROJECTION_YEARS = 10;
