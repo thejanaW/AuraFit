@@ -38,6 +38,11 @@ export const api = {
 
   refresh: () => request('/auth/refresh', { method: 'POST' }),
 
+  // Throws 401 (err.message 'Incorrect password') if the password doesn't
+  // match — callers should surface that inline rather than as a generic error.
+  deleteAccount: (password) =>
+    request('/auth/account', { method: 'DELETE', body: JSON.stringify({ password }) }),
+
   // Returns { user: { id, email, name, created_at } } for the authed user.
   getMe: () => request('/auth/me'),
 
@@ -104,4 +109,10 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ reward_pin_id: rewardPinId, lat, lng }),
     }),
+
+  // Returns { coupons: [{ id, brand_name, description, discount_value,
+  // claimedAt }] }, most recently claimed first — the full collection, for
+  // the Profile -> My Coupons screen (distinct from claimReward's response,
+  // which only ever carries the single coupon just claimed).
+  getClaimedCoupons: () => request('/api/rewards/coupons'),
 };

@@ -14,6 +14,7 @@ import { useFocusEffect } from '@react-navigation/native';
 
 import { api } from '../services/api';
 import { colors, fonts, cardStyle } from '../theme';
+import CouponRewardModal from '../components/CouponRewardModal';
 
 // Public Snazzy Maps-style dark theme JSON for Google Maps, matching the
 // app's dark palette instead of the default light basemap.
@@ -48,7 +49,11 @@ export default function MapScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [claiming, setClaiming] = useState(false);
-  const [feedback, setFeedback] = useState(null); // { type: 'success'|'error', text }
+  const [feedback, setFeedback] = useState(null); // { type: 'success'|'error', text } — errors + "already claimed" only now; a fresh success opens rewardModal instead
+  // { pointsAwarded, brandName, coupon } — kept in place (not cleared) while
+  // the modal closes, so its fade-out animation doesn't flash empty content
+  const [rewardModal, setRewardModal] = useState(null);
+  const [rewardModalVisible, setRewardModalVisible] = useState(false);
 
   const loadPins = useCallback(async (coords) => {
     try {
@@ -98,12 +103,21 @@ export default function MapScreen() {
     setFeedback(null);
     try {
       const res = await api.claimReward(selectedPin.id, position.latitude, position.longitude);
-      setFeedback({
-        type: 'success',
-        text: res.alreadyClaimed
-          ? 'Already claimed'
-          : `+${res.pointsAwarded} points from ${res.brandName}!`,
-      });
+      if (res.alreadyClaimed) {
+        // No new coupon on a repeat/idempotent claim — the backend only
+        // picks one on the fresh-claim path (rewards.js), so this stays a
+        // plain text note rather than opening the celebration modal.
+        setFeedback({ type: 'success', text: 'Already claimed' });
+      } else {
+        // Fresh claim — replaces the old inline "+N points" toast with the
+        // full celebration modal (points + random coupon + confetti).
+        setRewardModal({
+          pointsAwarded: res.pointsAwarded,
+          brandName: res.brandName,
+          coupon: res.coupon ?? null,
+        });
+        setRewardModalVisible(true);
+      }
       await loadPins(position);
       setSelectedPin((prev) => (prev ? { ...prev, claimed: true } : prev));
     } catch (err) {
@@ -229,6 +243,14 @@ export default function MapScreen() {
           )}
         </View>
       )}
+
+      <CouponRewardModal
+        visible={rewardModalVisible}
+        onClose={() => setRewardModalVisible(false)}
+        pointsAwarded={rewardModal?.pointsAwarded}
+        brandName={rewardModal?.brandName}
+        coupon={rewardModal?.coupon}
+      />
     </View>
   );
 }

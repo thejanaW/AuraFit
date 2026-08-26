@@ -89,6 +89,41 @@ router.get('/me', requireAuth, async (req, res) => {
   res.json({ user });
 });
 
+// DELETE /auth/account — Body: { password }. Requires re-entering the
+// current password as confirmation (a UI dialog alone is trivially tapped
+// through; this can't be, and it's the same bar login already uses). Every
+// other table's user_id FK is `on delete cascade` (verified across every
+// migration — health_inputs, predictions, habits, habit_sets, points,
+// reward_claims, claimed_coupons), so deleting this one row cleans up the
+// account's data everywhere, no manual per-table cleanup needed here.
+router.delete('/account', requireAuth, async (req, res) => {
+  const { password } = req.body ?? {};
+  if (typeof password !== 'string' || !password) {
+    return res.status(400).json({ error: 'password is required' });
+  }
+
+  const { data: user, error: fetchError } = await supabase
+    .from('users')
+    .select('password_hash')
+    .eq('id', req.userId)
+    .single();
+  if (fetchError || !user) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+
+  const valid = await bcrypt.compare(password, user.password_hash);
+  if (!valid) {
+    return res.status(401).json({ error: 'Incorrect password' });
+  }
+
+  const { error: deleteError } = await supabase.from('users').delete().eq('id', req.userId);
+  if (deleteError) {
+    return res.status(500).json({ error: `Failed to delete account: ${deleteError.message}` });
+  }
+
+  res.json({ success: true });
+});
+
 // POST /auth/refresh
 router.post('/refresh', (req, res) => {
   const authHeader = req.headers.authorization;

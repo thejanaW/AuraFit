@@ -151,11 +151,11 @@ export default function HomeScreen({ navigation }) {
           </TouchableOpacity>
         </View>
 
-        {/* Digital Twin avatar — tier0.mp4 is the only real clip so far and is
-            used as a TEMPORARY stand-in for all three tiers (see
-            AvatarPlayer.js). Tier is driven by the real predicted_health_score. */}
+        {/* Digital Twin avatar — all three real tier clips are wired (see
+            AvatarPlayer.js). Tier is driven by lifetime POINTS (not the
+            health score): tier 1 at >=90 pts, tier 2 at >=200 pts. */}
         <View style={styles.avatarArea}>
-          <AvatarPlayer score={score} />
+          <AvatarPlayer points={pointsTotal} />
         </View>
 
         {error && (

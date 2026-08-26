@@ -10,20 +10,20 @@ const TIER_0_SOURCE = require('../../assets/avatar/tier0.mp4');
 const TIER_1_SOURCE = require('../../assets/avatar/tier1.mp4');
 const TIER_2_SOURCE = require('../../assets/avatar/tier2.mp4');
 
-// Score -> tier thresholds. Named + centralised here so they're easy to
-// recalibrate later against the real peer-relative score range (avatar
-// tiers are still deliberately unboundaried per AuraFit_Full_Context.md).
-export const AVATAR_TIER_MAX_SCORE = {
-  TIER_0: 45, // score <= 45
-  TIER_1: 60, // 46-60
-  // 61+ -> tier 2
+// Points -> tier thresholds. Driven by the user's LIFETIME points total
+// (same number as Home's POINTS card — GET /api/points/total, habits +
+// reward claims combined), not the health score. Reaching a milestone
+// upgrades immediately (>=), not the point after it.
+export const AVATAR_TIER_MIN_POINTS = {
+  TIER_1: 90, // >=90 total points -> tier 1
+  TIER_2: 200, // >=200 total points -> tier 2
 };
 
-function tierForScore(score) {
-  if (typeof score !== 'number' || Number.isNaN(score)) return 0;
-  if (score <= AVATAR_TIER_MAX_SCORE.TIER_0) return 0;
-  if (score <= AVATAR_TIER_MAX_SCORE.TIER_1) return 1;
-  return 2;
+function tierForPoints(points) {
+  if (typeof points !== 'number' || Number.isNaN(points)) return 0;
+  if (points >= AVATAR_TIER_MIN_POINTS.TIER_2) return 2;
+  if (points >= AVATAR_TIER_MIN_POINTS.TIER_1) return 1;
+  return 0;
 }
 
 const TIER_SOURCES = [TIER_0_SOURCE, TIER_1_SOURCE, TIER_2_SOURCE];
@@ -36,8 +36,8 @@ const SIZE = 200;
 const RING_COLOR = '#3B82F6';
 const RING_GLOW = 'rgba(59, 130, 246, 0.28)';
 
-export default function AvatarPlayer({ score, size = SIZE }) {
-  const tier = tierForScore(score);
+export default function AvatarPlayer({ points, size = SIZE }) {
+  const tier = tierForPoints(points);
   const source = TIER_SOURCES[tier];
 
   const player = useVideoPlayer(source, (p) => {

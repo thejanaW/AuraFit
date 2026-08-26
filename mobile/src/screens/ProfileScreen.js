@@ -15,6 +15,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
 import { colors, fonts, cardStyle } from '../theme';
+import DeleteAccountModal from '../components/DeleteAccountModal';
 
 // Same email-prefix fallback as HomeScreen, for users with no stored name
 // (pre-migration-006 accounts, or older client builds).
@@ -32,6 +33,16 @@ export default function ProfileScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const [score, setScore] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+
+  // Throws on failure so DeleteAccountModal's own error handling shows it
+  // inline (e.g. wrong password) instead of the account being torn down
+  // client-side on a request that didn't actually succeed server-side.
+  async function handleDeleteAccount(password) {
+    await api.deleteAccount(password);
+    setDeleteModalVisible(false);
+    await logout(); // clears stored token/user; AppNavigator bounces to Login
+  }
 
   useFocusEffect(
     useCallback(() => {
@@ -95,11 +106,37 @@ export default function ProfileScreen({ navigation }) {
           )}
         </View>
 
+        <TouchableOpacity
+          style={styles.couponsButton}
+          onPress={() => navigation.navigate('Coupons')}
+          activeOpacity={0.8}
+        >
+          <View style={styles.couponsButtonLeft}>
+            <Ionicons name="gift-outline" size={18} color={colors.accent} />
+            <Text style={styles.couponsButtonText}>My Coupons</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={colors.textFaint} />
+        </TouchableOpacity>
+
         <TouchableOpacity style={styles.logoutButton} onPress={logout} activeOpacity={0.8}>
           <Ionicons name="log-out-outline" size={18} color={colors.negative} />
           <Text style={styles.logoutText}>Log Out</Text>
         </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.deleteAccountButton}
+          onPress={() => setDeleteModalVisible(true)}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.deleteAccountText}>Delete Account</Text>
+        </TouchableOpacity>
       </ScrollView>
+
+      <DeleteAccountModal
+        visible={deleteModalVisible}
+        onClose={() => setDeleteModalVisible(false)}
+        onConfirm={handleDeleteAccount}
+      />
     </LinearGradient>
   );
 }
@@ -193,6 +230,25 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.textMuted,
   },
+  couponsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    ...cardStyle,
+    paddingVertical: 15,
+    paddingHorizontal: 18,
+    marginBottom: 12,
+  },
+  couponsButtonLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  couponsButtonText: {
+    fontFamily: fonts.medium,
+    fontSize: 15,
+    color: colors.text,
+  },
   logoutButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -206,5 +262,18 @@ const styles = StyleSheet.create({
     fontFamily: fonts.semibold,
     fontSize: 15,
     color: colors.negative,
+  },
+  // Deliberately quieter than Log Out — a plain text link, not a bordered
+  // button, so it doesn't compete for attention with an everyday action but
+  // is still clearly there and clearly red for an irreversible one.
+  deleteAccountButton: {
+    alignItems: 'center',
+    paddingVertical: 16,
+  },
+  deleteAccountText: {
+    fontFamily: fonts.medium,
+    fontSize: 13,
+    color: colors.negative,
+    opacity: 0.7,
   },
 });
