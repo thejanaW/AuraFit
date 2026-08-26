@@ -12,6 +12,9 @@
 
 The app takes user lifestyle inputs, runs them through a trained ML model to predict a ~10-year, per-condition health risk projection, visualises overall health through a Digital Twin avatar, and motivates action through a gamified, AI-personalised habit checklist and a GPS-based location reward system.
 
+### Project Naming History
+Originally proposed and submitted under the working name **"RunReward"** during the Contextual Report / proposal stage (April submission). Later renamed to **"AuraFit"** at some point during development — no specific documented reason for the change, just a rebrand. Worth a brief mention if the dissertation's introduction/background discusses the project's evolution from proposal to final product.
+
 ---
 
 ## Core System Logic (Critical)
@@ -114,6 +117,21 @@ AuraFit/
 ---
 
 ## Five Chunk Build Plan
+
+### Original Work Breakdown Structure vs. Actual Execution
+The original planned WBS (from the Contextual Report / proposal) laid out 5 sprints:
+1. Infrastructure & Auth
+2. ML + Habit Generation (combined into one sprint)
+3. Avatar System (its own dedicated sprint)
+4. GPS Reward Map
+5. Security Layer (JWT hardening, rate limiting, input validation)
+
+**What actually happened diverges in three ways, each worth documenting honestly in the dissertation's methodology/reflection sections:**
+- **ML and Habit Generation were split apart in practice.** ML became its own dedicated chunk (Chunk 2), and Habit Generation ended up bundled with the Avatar work instead (Chunk 3) — because habit generation needed the completed risk breakdown as an input, so it couldn't proceed until the ML prediction pipeline existed and was stable. A dependency-driven reordering, not a planning failure.
+- **The Avatar**, originally scoped as its own dedicated sprint mid-project, was **deliberately deferred to the very end of development** instead (see "Avatar — Important Framing & Current Plan" below) — tier boundaries needed calibrating against the real peer-relative score range, which wasn't available until the ML + risk-banding work was finished and validated.
+- **The planned "Security Layer" sprint (JWT hardening, rate limiting, input validation) was NOT executed as its own dedicated effort.** See "Security Posture" section below for the full audited state as of 2026-08-23.
+
+This is legitimate material for a dissertation's Agile/methodology reflection — plans adapting to real dependency discoveries during iterative development is a normal, defensible outcome, not something to hide.
 
 ### Chunk 1 — Foundation & Auth ✅ COMPLETE
 
@@ -268,6 +286,44 @@ Health visualisation tool only — not a physical likeness of the user. Delibera
 
 ## Methodology
 Agile — five iterative sprints. Dissertation writing runs in parallel from Sprint 3 onward.
+
+---
+
+## Primary Research — Market Research Survey (April Contextual Report)
+**NOT a placeholder.** Real primary research was already conducted during the April Contextual Report / proposal stage: a market research survey with **167 respondents**, covering:
+- Age / occupation / platform demographics
+- Physical activity barriers
+- Motivation for personalized health prediction
+- GPS reward likelihood (willingness to engage with location-based rewards)
+- Comfort with data entry (onboarding/health-input burden tolerance)
+
+This data already exists from the Contextual Report and should be **referenced and cited properly** in the dissertation (e.g. background/justification chapter, or wherever the proposal's primary research is discussed) — it should NOT be treated as missing or left as a placeholder to redo. Locate the original April Contextual Report document/survey results and cite them directly rather than re-running or re-describing generic market research.
+
+---
+
+## Security Posture (Audited 2026-08-23) — IMPORTANT FOR CHAPTERS 6 & 7
+
+A direct code audit was performed on the backend (confirmed via inspection, not assumed) covering JWT handling, rate limiting, input validation consistency, and general hardening (CORS, security headers, SQL injection protection).
+
+**What exists (from Chunk 1 onward):**
+- JWT-based authentication (`requireAuth` middleware) — verified on every protected route, consistently applied.
+- RLS enabled on all Supabase tables (though the backend connects via the service-role key, which bypasses RLS for its own queries — authorization in practice relies on the backend consistently filtering by `user_id`, confirmed applied correctly across every route).
+- SQL injection protection via Supabase's parameterized query builder — no raw string-concatenated SQL anywhere in the backend.
+- Per-route input validation exists in places — strong/declarative on `predictions.js` and `health-inputs.js` (typed rules, range-checked), but ad-hoc and inconsistent elsewhere (`habits.js`, `rewards.js`, `streak.js`), and weakest on `auth.js` itself (no email format check, no password minimum length).
+
+**What is confirmed ABSENT:**
+- **Rate limiting: entirely absent.** No `express-rate-limit` or equivalent anywhere in the codebase, on ANY route — including `/auth/login` and `/auth/register`, which are unlimited/brute-forceable.
+- **Security headers: absent.** No `helmet.js` or equivalent — no CSP, HSTS, X-Frame-Options, etc.
+- **CORS: unhardened.** `cors()` used with no origin restriction (default = any origin allowed).
+- JWT secret has no rotation mechanism; `/auth/refresh` accepts expired-but-validly-signed tokens indefinitely, undermining the practical effect of the configured expiry.
+
+**DECISION (recorded 2026-08-23): security hardening (rate limiting, consistent input validation, security headers/CORS) is DELIBERATELY DEFERRED until after dissertation submission.** A scope/time decision, not an oversight discovered too late to act on.
+
+**⚠️ Dissertation-writing flag — write this honestly, do not gloss over it:**
+- **Chapter 6 (Evaluation → Limitations Identified):** the current absence of rate limiting, inconsistent validation, and missing security headers/CORS hardening must be listed as a genuine, currently-existing limitation of the system as submitted — not implied to be "done" or "in progress."
+- **Chapter 7 (Conclusion → Future Scope and Recommendations):** the deferred Security Layer sprint (rate limiting, consistent validation via a shared library, helmet.js, CORS allowlisting, JWT rotation/refresh-token redesign) belongs here as explicit, named future work — exactly the kind of concrete, scoped recommendation a FYP conclusion should contain.
+
+Do NOT describe security hardening as already completed in any dissertation chapter — the honest framing is "identified and audited, deliberately deferred by scope/time decision, documented as future work."
 
 ---
 

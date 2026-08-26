@@ -6,16 +6,9 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { colors } from '../theme';
 
-// ---------------------------------------------------------------------------
-// TEMPORARY STAND-IN ASSET
-// Only tier0.mp4 has been produced so far. Tiers 1 and 2 are not made yet, so
-// ALL THREE tier slots below point at the same tier0 clip as a placeholder.
-// Swap TIER_1_SOURCE / TIER_2_SOURCE for their real assets (and drop this
-// notice) once tier1.mp4 / tier2.mp4 exist.
-// ---------------------------------------------------------------------------
 const TIER_0_SOURCE = require('../../assets/avatar/tier0.mp4');
-const TIER_1_SOURCE = TIER_0_SOURCE; // TODO: replace with require('../../assets/avatar/tier1.mp4')
-const TIER_2_SOURCE = TIER_0_SOURCE; // TODO: replace with require('../../assets/avatar/tier2.mp4')
+const TIER_1_SOURCE = require('../../assets/avatar/tier1.mp4');
+const TIER_2_SOURCE = require('../../assets/avatar/tier2.mp4');
 
 // Score -> tier thresholds. Named + centralised here so they're easy to
 // recalibrate later against the real peer-relative score range (avatar
