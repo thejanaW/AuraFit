@@ -27,7 +27,27 @@ services:
         sync: false
       - key: GEMINI_API_KEY
         sync: false
-      # FastAPI ML service (ml-service/). POST /api/predictions returns 502
-      # until this points at a reachable deployment.
+      # Public URL of aurafit-ml below. Set once after that service is live —
+      # fromService only exposes host/port, and the backend needs a scheme.
       - key: ML_SERVICE_URL
         sync: false
+
+  - type: web
+    name: aurafit-ml
+    runtime: python
+    plan: free
+    region: singapore
+    # Monorepo: build and run only the FastAPI risk-scoring service
+    repo: https://github.com/thejanaW/AuraFit
+    rootDir: ml-service
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    branch: main
+    autoDeployTrigger: commit
+    envVars:
+      # Must stay 3.12 — requirements.txt pins numpy==2.0.2, which ships no
+      # cp313 wheel. On Render's default Python the build falls back to
+      # compiling numpy from source and fails.
+      - key: PYTHON_VERSION
+        value: "3.12"
