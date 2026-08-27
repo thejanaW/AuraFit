@@ -37,6 +37,48 @@ function validateLifestyleInput(body) {
   return { errors, values };
 }
 
+// The ML service runs on a free instance that spins down after ~15 minutes
+// idle. Waking it takes 30-60s, and while it wakes the platform's edge answers
+// with its own 502/503 — the request never reaches uvicorn, so a generous
+// timeout alone does not help. Retry those statuses (and outright connection
+// failures) a couple of times so the first prediction after a quiet period
+// pays a wait instead of failing. A warm service answers in ~0.1s, so this
+// costs nothing in the normal case.
+const ML_COLD_START_STATUSES = new Set([502, 503, 504]);
+// Backoff totalling ~54s, measured against a real cold start that took 42s.
+// The edge can reject instantly while waking, so a short retry budget would
+// give up long before the service is ready.
+const ML_RETRY_DELAYS_MS = [3000, 6000, 10000, 15000, 20000];
+
+async function callMlService(mlServiceUrl, values) {
+  let lastError;
+  const ML_RETRIES = ML_RETRY_DELAYS_MS.length;
+  for (let attempt = 0; attempt <= ML_RETRIES; attempt++) {
+    if (attempt > 0) {
+      await new Promise((resolve) => setTimeout(resolve, ML_RETRY_DELAYS_MS[attempt - 1]));
+    }
+    try {
+      const res = await fetch(`${mlServiceUrl}/predict`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(values),
+        signal: AbortSignal.timeout(60_000),
+      });
+      if (!ML_COLD_START_STATUSES.has(res.status)) return res;
+      lastError = null;
+      // Retry-worthy status — fall through and try again, but hand the last
+      // response back if we run out of attempts so the caller can report it.
+      if (attempt === ML_RETRIES) return res;
+    } catch (err) {
+      // Connection reset mid-wake is the same situation as a 502; only give up
+      // once the attempts are exhausted.
+      lastError = err;
+      if (attempt === ML_RETRIES) throw err;
+    }
+  }
+  throw lastError ?? new Error('ML service unreachable');
+}
+
 // POST /api/predictions — run ML prediction for the authed user and store it
 router.post('/', requireAuth, async (req, res) => {
   const { errors, values } = validateLifestyleInput(req.body);
@@ -48,16 +90,7 @@ router.post('/', requireAuth, async (req, res) => {
   const mlServiceUrl = process.env.ML_SERVICE_URL || 'http://localhost:8000';
   let mlResult;
   try {
-    const mlRes = await fetch(`${mlServiceUrl}/predict`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(values),
-      // 60s, not 10s: the ML service runs on a free instance that spins down
-      // after 15 minutes idle and takes 30-60s to cold start. A warm predict
-      // answers in well under a second, so this ceiling only ever costs the
-      // first request after a quiet period — which would otherwise 503.
-      signal: AbortSignal.timeout(60_000),
-    });
+    const mlRes = await callMlService(mlServiceUrl, values);
     if (!mlRes.ok) {
       const detail = await mlRes.text().catch(() => '');
       return res.status(502).json({
