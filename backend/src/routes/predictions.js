@@ -52,7 +52,11 @@ router.post('/', requireAuth, async (req, res) => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(values),
-      signal: AbortSignal.timeout(10_000),
+      // 60s, not 10s: the ML service runs on a free instance that spins down
+      // after 15 minutes idle and takes 30-60s to cold start. A warm predict
+      // answers in well under a second, so this ceiling only ever costs the
+      // first request after a quiet period — which would otherwise 503.
+      signal: AbortSignal.timeout(60_000),
     });
     if (!mlRes.ok) {
       const detail = await mlRes.text().catch(() => '');
