@@ -1,0 +1,33 @@
+services:
+  - type: web
+    name: aurafit-backend
+    runtime: node
+    plan: free
+    region: singapore
+    # Monorepo: build and run only the Express API in backend/
+    repo: https://github.com/thejanaW/AuraFit
+    rootDir: backend
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /health
+    branch: main
+    autoDeployTrigger: commit
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      # Render generates a strong random secret once and keeps it stable
+      - key: JWT_SECRET
+        generateValue: true
+      # Secrets — fill these in the Dashboard when applying the Blueprint
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      # FastAPI ML service (ml-service/). POST /api/predictions returns 502
+      # until this points at a reachable deployment.
+      - key: ML_SERVICE_URL
+        sync: false
