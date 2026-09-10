@@ -23,13 +23,6 @@ OUT_CSV  = os.path.join(OUT_DIR, "brfss_2023_trimmed.csv")
 
 # ---------------------------------------------------------------------------
 # Column map: BRFSS 2023 variable name → readable column name
-#
-# NOTES ON WHAT IS MISSING FROM THE 2023 LLCP FILE:
-#   - Sleep hours (SLEPTIM1): not present in this distributed file.
-#   - Fruit intake (_FRTLT1): not present in this distributed file.
-#   - Vegetable intake (_VEGLT1): not present in this distributed file.
-#   - "Family history" of heart disease: BRFSS does not collect family history.
-#     We use the respondent's own cardiac history (CVDINFR4, CVDCRHD4) instead.
 # ---------------------------------------------------------------------------
 COLUMN_MAP = {
     # Demographic

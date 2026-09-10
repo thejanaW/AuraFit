@@ -4,6 +4,7 @@ const { requireAuth } = require('../middleware/auth');
 
 const router = express.Router();
 
+// ------------------------------- //
 // Validation rules mirror the ML service's Pydantic model (BRFSS category codes)
 const FIELD_RULES = {
   age_group:             { min: 1, max: 13, integer: true },
@@ -37,17 +38,13 @@ function validateLifestyleInput(body) {
   return { errors, values };
 }
 
+// ------------------------------- //
 // The ML service runs on a free instance that spins down after ~15 minutes
 // idle. Waking it takes 30-60s, and while it wakes the platform's edge answers
 // with its own 502/503 — the request never reaches uvicorn, so a generous
-// timeout alone does not help. Retry those statuses (and outright connection
-// failures) a couple of times so the first prediction after a quiet period
-// pays a wait instead of failing. A warm service answers in ~0.1s, so this
-// costs nothing in the normal case.
+// timeout alone does not help. 
 const ML_COLD_START_STATUSES = new Set([502, 503, 504]);
 // Backoff totalling ~54s, measured against a real cold start that took 42s.
-// The edge can reject instantly while waking, so a short retry budget would
-// give up long before the service is ready.
 const ML_RETRY_DELAYS_MS = [3000, 6000, 10000, 15000, 20000];
 
 async function callMlService(mlServiceUrl, values) {
@@ -79,6 +76,7 @@ async function callMlService(mlServiceUrl, values) {
   throw lastError ?? new Error('ML service unreachable');
 }
 
+// ------------------------------- //
 // POST /api/predictions — run ML prediction for the authed user and store it
 router.post('/', requireAuth, async (req, res) => {
   const { errors, values } = validateLifestyleInput(req.body);

@@ -1,0 +1,59 @@
+AuraFit — AI Usage Disclosure
+Final-year dissertation project — Majith Thejana Wahalathanthrie (2542227)
+
+The following is a list of instances where generative AI tools (Claude, by
+Anthropic, via Claude Code) were used throughout this project to assist in
+overcoming technical or analytical challenges, rather than creating the
+system itself.
+
+1. Age dominance bias fix in ML model
+Whereas the initial outputs of the machine learning model were dominated by
+respondent's age, the AI tool assisted in reasoning the root cause of such
+behavior - cross-sectional bias of the CDC BRFSS dataset - and in assessing
+the available correction methods. That helped the team to decide on a +10
+years age projection and to adopt the four age-sensitive peer-relative risk
+bands (18-34, 35-49, 50-64, 65+) after discussion of pros and cons of a few
+different approaches.
+
+2. GPS reward security design
+In creating the claim verification flow of the GPS Reward Map, the AI tool
+assisted in realizing the reasons behind client-reported distance being
+unreliable and in deciding on implementing server-side PostGIS recheck of
+the claimed distance, as well as preventing double-claims from the database
+side.
+
+3. Debugging the default-value slider in Step 7
+Whereas the unhealthy test profile had an incorrectly high score of 84/100,
+the AI tool helped with systematic debugging which led to realization that a
+default-value slider was silently affecting one of the most influential
+variables of the ML model.
+
+4. Habit generation reliability (Gemini API)
+While considering the risks of inconsistent JSON response from the Gemini
+API in the habit generation feature, the AI tool assisted in deciding to
+implement try/catch parsing and to use fallback default habits.
+
+5. Pre-submission accuracy review of reviewer-facing documentation
+While preparing the User Manual and README for submission, the AI tool was
+used to cross-check the written setup and usage instructions against the
+actual, current codebase rather than trust earlier drafts. This surfaced
+several places where the documentation had drifted from the implementation
+- e.g. the Digital Twin avatar description (score-driven wording left over
+from an earlier version, versus the current points-driven tiering), the GPS
+reward map's pin-colour meaning and once-per-day versus once-ever claim
+limit, and an undisclosed reward-redemption coupon feature - all of which
+were corrected as a result.
+
+6. Diagnosing a silent local-environment setup failure
+When reviewing the "run the app locally" instructions, the AI tool traced
+why a fresh clone/unzip of the mobile app would fail to reach any backend:
+the required .env file is intentionally excluded from version control, and
+without it the app silently falls back to a local address that does not
+resolve to anything on a reviewer's machine. This led to adding the missing
+setup step (copying the committed .env.example file, which points at the
+already-hosted backend) to both the User Manual and the submission readme.
+
+In all cases, the AI tool acted in an assistive/advisory capacity -
+surfacing root causes, explaining trade-offs, and helping verify proposed
+fixes against the actual code - with implementation decisions, code, and
+final wording reviewed and applied by the author.

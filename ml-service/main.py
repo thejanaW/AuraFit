@@ -37,22 +37,12 @@ CONDITIONS = ["heart_attack", "heart_disease", "diabetes", "high_bp"]
 # ---------------------------------------------------------------------------
 # Age-sensitive risk bands (Chunk 3 revision — dissertation reference)
 #
-# Tercile thresholds are now computed per life-stage bucket (4 buckets × 4
-# conditions, see define_risk_bands.py), because age dominates the models'
-# learned risk: under global terciles nearly every under-35 landed "Low"
-# regardless of lifestyle. Bucket-specific terciles make a band mean "your
-# rank against your own age peers", so lifestyle can actually move it.
-#
 # 4 buckets rather than the 13 BRFSS bands: the data-sufficiency check
 # (scratchpad/age_sufficiency_check.py) showed the 4 buckets already carry
 # most of the age gradient (~19x heart-attack prevalence spread, 0.5% →
 # 9.6%), while finer bands leave per-tercile positive counts too thin to
 # validate — e.g. only 45 heart-disease positives in the whole 25-29 band.
-#
-# The mobile app projects age +10 years before banding (see
-# onboardingPayloads.js), so the bucket is chosen from the PROJECTED age —
-# the two mechanisms combine into "your rank among the age peers you're
-# heading towards".
+
 # ---------------------------------------------------------------------------
 AGE_GROUP_TO_BUCKET = {
     1: "18-34", 2: "18-34", 3: "18-34",
@@ -62,33 +52,13 @@ AGE_GROUP_TO_BUCKET = {
 }
 
 # ---------------------------------------------------------------------------
-# Overall health score — weighting logic (dissertation reference)
-#
-# Step 1 — normalise each condition's raw probability to a 0-1 "risk index".
-#   The models were trained with class_weight="balanced", which inflates raw
-#   probabilities by a different amount per condition, so raw values are NOT
-#   comparable across conditions. The saved tercile thresholds, however, are
-#   known anchor points: low_upper is the 33rd percentile of predicted risk
-#   and moderate_upper the 67th. Mapping piecewise-linearly
-#     0 → 0.0,  low_upper → 1/3,  moderate_upper → 2/3,  1 → 1.0
-#   converts every condition onto the same approximate percentile scale.
-#   Since the thresholds became bucket-specific (see AGE_GROUP_TO_BUCKET),
-#   these anchors are the requester's AGE-BUCKET terciles, so the overall
-#   score is likewise peer-relative: 0 = lowest predicted risk among the
-#   (projected) age peers, 1 = highest. This keeps the score consistent
-#   with the bands rather than mixing a global scale with peer-based bands.
-#
-# Step 2 — weighted average of the four risk indices:
-#   heart_attack   0.30   acute, potentially fatal cardiac event
-#   heart_disease  0.30   chronic cardiac condition, high mortality burden
-#   diabetes       0.20   serious but more manageable, higher prevalence
-#   high_bp        0.20   most common (41% of dataset), usually controllable
-#   Cardiac conditions are weighted higher because they are rarer and more
-#   severe — a high cardiac risk should pull the overall score down harder
-#   than a high blood-pressure risk, which affects ~4 in 10 adults.
-#
-# Step 3 — overall_health_score = round(100 × (1 − weighted_risk)),
-#   so 100 = lowest possible predicted risk, 0 = highest.
+# Overall health score:
+# 1. Convert each condition's raw probability into a 0-1 risk index, scaled
+#    using that condition's own tercile thresholds (low_upper→1/3, moderate_upper→2/3)
+#    so all four conditions land on the same comparable scale.
+# 2. Weighted average: heart_attack 0.30, heart_disease 0.30 (rarer, more severe),
+#    diabetes 0.20, high_bp 0.20 (more common, more manageable).
+# 3. overall_health_score = round(100 × (1 − weighted_risk)) → 100 = lowest risk.
 # ---------------------------------------------------------------------------
 CONDITION_WEIGHTS = {
     "heart_attack": 0.30,
@@ -192,6 +162,7 @@ def predict(inputs: LifestyleInput):
             risk_breakdown[cond] = probability_to_band(p, cutoffs)
             weighted_risk += CONDITION_WEIGHTS[cond] * probability_to_risk_index(p, cutoffs)
 
+# --- how the score xx/100 is calculated 
         return PredictionResponse(
             overall_health_score=round(100 * (1 - weighted_risk)),
             risk_breakdown=risk_breakdown,

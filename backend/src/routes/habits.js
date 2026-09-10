@@ -83,16 +83,11 @@ router.get('/current-set', requireAuth, async (req, res) => {
   }
 });
 
+
+// ------------------------------- //
 // POST /api/habits/generate — create this month's habit set via Gemini.
 // Body: { month: 'YYYY-MM' }
 //
-// Gathers the user's latest risk breakdown + health inputs + previous month's
-// completion rates, asks Gemini for 5 habits + a score-reasoning paragraph in
-// one call, and stores the result. On ANY Gemini failure (API error, bad
-// JSON, missing fields) it stores the hardcoded fallback list instead — the
-// user always ends up with a working checklist, and `source` records which
-// path produced it. Idempotent: if the month already has a set, returns it
-// unchanged rather than generating a duplicate.
 router.post('/generate', requireAuth, async (req, res) => {
   const month = typeof req.body?.month === 'string' && MONTH_RE.test(req.body.month)
     ? req.body.month
@@ -104,6 +99,7 @@ router.post('/generate', requireAuth, async (req, res) => {
       return res.json({ set: existing, alreadyExisted: true });
     }
 
+    // ------------------------------- //
     const [predictionRes, inputsRes, previousMonth] = await Promise.all([
       supabase
         .from('predictions')
@@ -122,6 +118,7 @@ router.post('/generate', requireAuth, async (req, res) => {
     if (predictionRes.error) throw new Error(`Failed to fetch prediction: ${predictionRes.error.message}`);
     if (inputsRes.error) throw new Error(`Failed to fetch health inputs: ${inputsRes.error.message}`);
 
+    // ------------------------------- //
     let habits;
     let reasoning;
     let source;
@@ -139,6 +136,7 @@ router.post('/generate', requireAuth, async (req, res) => {
       source = 'fallback';
     }
 
+    // -----------INSERT DATA TO SUPABASE------------ //
     const { data: setRow, error: setError } = await supabase
       .from('habit_sets')
       .insert({ user_id: req.userId, month, reasoning, source })

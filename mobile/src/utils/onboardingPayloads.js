@@ -19,7 +19,7 @@ export function ageToAgeGroup(age) {
   return Math.floor((age - 25) / 5) + 2;
 }
 
-
+// ------------------------------- //
 // reframes the score as "where you'd land in ~10 years if this continues"
 // rather than a current-state snapshot.
 export const RISK_PROJECTION_YEARS = 10;
@@ -95,6 +95,7 @@ function mapOrThrow(map, value, field) {
   return code;
 }
 
+// ------------------------------- //
 export function buildModelPayload(answers) {
   const currentAge = required(answers, 'age');
   if (currentAge < 18) throw new Error('Age must be 18 or over');
@@ -111,6 +112,7 @@ export function buildModelPayload(answers) {
   };
 }
 
+// ------------------------------- //
 export function buildHealthInputsPayload(answers) {
   return {
     sleep_hours: required(answers, 'sleepHours'),
