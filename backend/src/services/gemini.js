@@ -145,6 +145,13 @@ async function callGemini(prompt, apiKey) {
   });
 }
 
+// gemini-flash-latest (free tier) returns 503 "model overloaded" fairly
+// often under load, and a single 2s retry isn't enough cover for that — it
+// can stay overloaded for 10-20s+. Retry up to 3 times with exponential
+// backoff before giving up to the fallback set.
+const MAX_RETRIES = 3;
+const RETRY_BASE_DELAY_MS = 2000;
+
 async function generateHabitSet({ riskBreakdown, healthInputs, previousMonth }) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error('GEMINI_API_KEY is not set');
@@ -152,10 +159,10 @@ async function generateHabitSet({ riskBreakdown, healthInputs, previousMonth }) 
   const prompt = buildPrompt({ riskBreakdown, healthInputs, previousMonth });
   let res = await callGemini(prompt, apiKey);
 
-  // One retry on transient overload/rate-limit — without it, a momentary 503
+  // Retry on transient overload/rate-limit — without it, a momentary 503
   // on the generate tap would lock the user's whole month to the fallback set
-  if (res.status === 503 || res.status === 429) {
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+  for (let attempt = 0; (res.status === 503 || res.status === 429) && attempt < MAX_RETRIES; attempt++) {
+    await new Promise((resolve) => setTimeout(resolve, RETRY_BASE_DELAY_MS * 2 ** attempt));
     res = await callGemini(prompt, apiKey);
   }
 
